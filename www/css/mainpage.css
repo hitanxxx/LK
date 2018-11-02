@@ -31,7 +31,8 @@ audio {
 }
 .glodec {
 	background-attachment:fixed;
-	background: url(https://i.loli.net/2018/10/22/5bcd21e8742ec.jpg) center;
+	#background: url(https://i.loli.net/2018/10/22/5bcd21e8742ec.jpg) center;
+    background: url(/images/white.jpg);
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -127,7 +128,7 @@ audio {
 	#text-align: center;
 }
 .music_core_wall {
-	box-shadow:1px 1px 45px 15px black;
+	#box-shadow:1px 1px 45px 15px black;
 	position: absolute;
 	overflow: hidden;
 	width: 280px;
@@ -137,7 +138,7 @@ audio {
 	left: 50%;
 }
 .music_core_dec {
-	box-shadow:1px 1px 10px 1px black inset;
+	#box-shadow:1px 1px 10px 1px black inset;
 	position: absolute;
 	top: 0px;
 	left: 0px;

@@ -87,6 +87,11 @@ audio.addEventListener( 'error', function () {
 	play2pause();
 	task_start(true);
 }, false );
+window.onbeforeunload = function(){
+	arr_index --;
+	// cookie set
+	document.cookie=arr_index;
+}
 function play2pause(){
 	document.getElementById("disk").className = "disk disk-rollstop";
 	document.getElementById("needle").className = "needle needle-pause";
