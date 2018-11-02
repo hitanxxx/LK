@@ -6,10 +6,6 @@ typedef struct serv_api_t {
 	string_t 			name;
 	serv_api_handler	handler;
 } serv_api_t;
-typedef struct serv_apis_t {
-	queue_t			queue;
-	serv_api_t 		*api;
-} serv_apis_t;
 
 status serv_init( void );
 status serv_end( void );

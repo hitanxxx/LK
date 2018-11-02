@@ -5,7 +5,8 @@ mkdir -p $L_OBJS/src \
 	$L_OBJS/src/util \
 	$L_OBJS/src/base \
 	$L_OBJS/src/http \
-	$L_OBJS/src/http/base \
+	$L_OBJS/src/lktp/ \
+	$L_OBJS/src/app/ \
 
 
 l_objs_dir=$L_OBJS$l_regex_dirsep

@@ -24,6 +24,8 @@ status dynamic_module_init( void )
 	http_response_head_init_module();
 	http_request_head_init_module();
 	http_entitybody_init_module();
+	lktp_head_init();
+	lktp_body_init();
 	serv_init();
 	webser_process_init();
 	perform_init();
@@ -39,6 +41,8 @@ status dynamic_module_end( void )
 	http_response_head_end_module();
 	http_request_head_end_module();
 	http_entitybody_end_module();
+	lktp_head_end();
+	lktp_body_end();
 	serv_end();
 	webser_process_end();
 	perform_end();

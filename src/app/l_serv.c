@@ -1,13 +1,13 @@
 #include "lk.h"
 
-static queue_t queue_apis;
+static mem_list_t 	*api_list = NULL;
 
 status api_perform_info( void * data );
 status api_perform_start( void * data );
 status api_perform_stop( void * data );
 status api_proxy( void * data );
 // ---------
-serv_api_t serv_elem_arr[] = {
+static serv_api_t serv_elem_arr[] = {
 	{ string("/perform_info"),			api_perform_info },
 	{ string("/perform_start"),			api_perform_start },
 	{ string("/perform_stop"),			api_perform_stop },
@@ -329,75 +329,44 @@ status api_perform_stop( void * data )
 // serv_api_find ------------------------
 status serv_api_find( string_t * key, serv_api_handler * handler )
 {
-	queue_t  * p;
-	serv_apis_t *apis;
+	uint32 i = 0;
+	serv_api_t ** t, *s;
 
-	for( p = queue_head( &queue_apis );
-		p != queue_tail( &queue_apis ); p = queue_next( p ) ) {
-		apis = l_get_struct( p, serv_apis_t, queue );
-		if( apis->api->name.len == key->len ) {
-			if( l_find_str( key->data, key->len, apis->api->name.data,
-				apis->api->name.len ) ) {
-				if( handler ) {
-					*handler = apis->api->handler;
-				}
-				return OK;
+	for( i = 0; i < api_list->elem_num; i ++ ) {
+		t = mem_list_get( api_list, i + 1 );
+		s = *t;
+		if( s->name.len == key->len &&
+		strncmp( s->name.data, key->data, key->len ) == 0 ) {
+			if( handler ) {
+				*handler = s->handler;
 			}
+			return OK;
 		}
 	}
 	return ERROR;
 }
-// serv_api_add ---------------------
-static status serv_api_add( serv_api_t * api )
-{
-	serv_apis_t * apis = NULL;
-
-	apis = (serv_apis_t*)malloc( sizeof(serv_apis_t) );
-	if( !apis ) {
-		err_log("%s --- malloc apis", __func__ );
-		return ERROR;
-	}
-	memset( apis, 0, sizeof(serv_apis_t) );
-	apis->api = api;
-	queue_insert_tail( &queue_apis, &apis->queue );
-	return OK;
-}
-// serv_api_init ---------------------
-static status serv_api_init( void )
-{
-	uint32 i = 0;
-
-	for( i = 0; serv_elem_arr[i].handler; i ++ ) {
-		if( OK != serv_api_add( &serv_elem_arr[i] ) ) {
-			err_log("%s --- add api", __func__ );
-			return ERROR;
-		}
-	}
-	return OK;
-}
 // serv_init ------------------------
 status serv_init( void )
 {
-	queue_init( &queue_apis );
+	uint32 i;
+	serv_api_t **t = NULL;
 
-	if( OK != serv_api_init( ) ) {
+	if( OK != mem_list_create( &api_list, sizeof(serv_api_t*) ) ) {
+		err_log("%s --- mem_list_create api_list", __func__ );
 		return ERROR;
+	}
+	for( i = 0; serv_elem_arr[i].handler; i ++ ) {
+		t = mem_list_push( api_list );
+		*t = &serv_elem_arr[i];
 	}
 	return OK;
 }
 // serv_end -----------------------
 status serv_end( void )
 {
-	serv_apis_t * apis = NULL;
-	queue_t * queue, *next;
-
-	queue = queue_head( &queue_apis );
-	while( queue != queue_tail( &queue_apis ) ) {
-		next = queue_next( queue );
-		queue_remove( queue );
-		apis = l_get_struct( queue, serv_apis_t, queue );
-		free( apis );
-		queue = next;
+	if( api_list ) {
+		mem_list_free( api_list );
 	}
+	api_list = NULL;
 	return OK;
 }
