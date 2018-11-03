@@ -1,6 +1,7 @@
 #ifndef _L_HTTP_REQUEST_HEAD_H_INCLUDED_
 #define _L_HTTP_REQUEST_HEAD_H_INCLUDED_
 
+#define REQ_LENGTH_URI_STR			2048
 typedef struct http_request_head_t http_request_head_t;
 typedef status ( * header_handler ) \
 ( http_request_head_t * request, string_t * str, uint32 offsetof );

@@ -49,13 +49,7 @@ function task_state_change ( state ) {
 	task_running = state;
 }
 function task_start ( play ) {
-	// cookie get
-	var cookie_index = document.cookie;
-	if( !cookie_index ) {
-		arr_index = (arr_index) % arr_length;
-	} else {
-		arr_index = cookie_index;
-	}
+	arr_index = (arr_index) % arr_length;
 	document.getElementById("name").innerHTML = "&nbsp&nbsp"
 	 + ( arr_song_name[arr_index] ).toUpperCase() + "&nbsp&nbsp";
 	document.getElementById("disk_inring").src = "/images/inring.png";
@@ -75,8 +69,6 @@ audio.addEventListener( 'canplay', function task_finish () {
 			task_finish_play = !task_finish_play;
 		}
 		arr_index ++;
-		// cookie set
-		document.cookie=arr_index;
 	}, 400 );
 }, false );
 audio.addEventListener( 'ended', function () {
@@ -88,9 +80,7 @@ audio.addEventListener( 'error', function () {
 	task_start(true);
 }, false );
 window.onbeforeunload = function(){
-	arr_index --;
-	// cookie set
-	document.cookie=arr_index;
+
 }
 function play2pause(){
 	document.getElementById("disk").className = "disk disk-rollstop";

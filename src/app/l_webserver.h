@@ -1,12 +1,12 @@
 #ifndef _L_WEBSERVER_H_INCLUDED_
 #define _L_WEBSERVER_H_INCLUDED_
 
-#define WEBSER_TIMEOUT		5
-#define REQ_LENGTH_INDEX_STR		32
-#define REQ_LENGTH_HOME_STR			256
-#define REQ_LENGTH_URI_STR			1024
-#define REQ_LENGTH_PATH_STR \
-( REQ_LENGTH_URI_STR + REQ_LENGTH_HOME_STR + REQ_LENGTH_INDEX_STR )
+#define WEBSER_TIMEOUT					5
+#define WEBSER_LENGTH_INDEX_STR			32
+#define WEBSER_LENGTH_HOME_STR			256
+#define WEBSER_LENGTH_PATH_STR \
+( REQ_LENGTH_URI_STR + WEBSER_LENGTH_HOME_STR + WEBSER_LENGTH_INDEX_STR )
+#define WEBSER_BODY_META_LENGTH		8192
 
 typedef struct webser_t
 {
@@ -22,7 +22,7 @@ typedef struct webser_t
 
 	uint32 				filesize;
 	uint32 				re_status;
-	char				filepath[REQ_LENGTH_PATH_STR];
+	char				filepath[WEBSER_LENGTH_PATH_STR];
 
 	int32				ffd;
 	meta_t				*response_head;

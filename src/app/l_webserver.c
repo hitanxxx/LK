@@ -39,11 +39,13 @@ Content-Length: 76\r\n\r\n\
 ");
 
 
-static string_t default_mimetype = string("Content-type: application/octet-stream\r\n");
+static string_t default_mimetype =
+					string("Content-type: application/octet-stream\r\n");
 static mime_type_t mimetype_table[] =
 {
 	{string(".html"),			string("Content-type: text/html\r\n")},
-	{string(".js"),				string("Content-type: application/x-javascript\r\n")},
+	{string(".js"),
+					string("Content-type: application/x-javascript\r\n")},
 	{string(".json"),			string("Content-type: application/json\r\n")},
 	{string(".png"),			string("Content-type: image/png\r\n")},
 	{string(".jpg"),			string("Content-type: image/jpeg\r\n")},
@@ -288,26 +290,52 @@ static status webser_send_response( event_t * ev )
 	status rc;
 	connection_t * c;
 	webser_t * webser;
+	uint32 read_length;
+	meta_t * cl;
 
 	c = ev->data;
 	webser = c->data;
-	rc = c->send_chain( c, webser->response_head );
-	if( rc == ERROR ) {
-		err_log( "%s --- send response", __func__ );
-		webser_over( webser );
-		return ERROR;
-	} else if( rc == DONE ) {
-		timer_del( &c->write->timer );
-		debug_log ( "%s --- success", __func__ );
-		if( webser->request_head->keepalive_flag && conf.http_keepalive ) {
-			return webser_keepalive( webser );
+	while( 1 ) {
+		rc = c->send_chain( c, webser->response_head );
+		if( rc == ERROR ) {
+			err_log( "%s --- send response", __func__ );
+			webser_over( webser );
+			return ERROR;
+		} else if( rc == DONE ) {
+			cl = webser->response_body;
+			if( webser->re_status == 200 ) {
+				cl->file_pos += meta_len( cl->start, cl->pos );
+			}
+			if( webser->re_status != 200 ||
+			( webser->re_status == 200 && ( cl->file_pos == cl->file_last) ) ) {
+				timer_del( &c->write->timer );
+				debug_log ( "%s --- success", __func__ );
+				if( webser->re_status == 200 &&
+					conf.http_keepalive &&
+					webser->request_head->keepalive_flag ) {
+					return webser_keepalive( webser );
+				}
+				return webser_over( webser );
+			} else {
+				cl->last = cl->pos = cl->start;
+				( ( cl->file_last - cl->file_pos) > WEBSER_BODY_META_LENGTH ) ?
+				( read_length = WEBSER_BODY_META_LENGTH ):
+				( read_length = ( cl->file_last - cl->file_pos) );
+				if( ERROR == read( webser->ffd, cl->last, read_length ) ) {
+					err_log( "%s --- read file data, errno [%d] [%s]", __func__,
+					errno, strerror(errno) );
+					webser_over( webser );
+					return ERROR;
+				}
+				cl->last = cl->pos + read_length;
+				continue;
+			}
 		}
-		return webser_over( webser );
+		c->write->timer.data = (void*)webser;
+		c->write->timer.handler = webser_time_out;
+		timer_add( &c->write->timer, WEBSER_TIMEOUT );
+		return rc;
 	}
-	c->write->timer.data = (void*)webser;
-	c->write->timer.handler = webser_time_out;
-	timer_add( &c->write->timer, WEBSER_TIMEOUT );
-	return rc;
 }
 // webser_test_reading ---------------------
 static status webser_test_reading( event_t * ev  )
@@ -365,7 +393,7 @@ status webser_response( event_t * ev )
 // webser_entity_body --------------------------------------
 static status webser_entity_body( webser_t * webser )
 {
-	uint32 send_file_flag = 0;
+	uint32 read_length = 0;
 
 	webser->ffd = open( webser->filepath, O_RDONLY );
 	if( webser->ffd == ERROR ) {
@@ -375,31 +403,30 @@ static status webser_entity_body( webser_t * webser )
 	}
 	debug_log ( "%s --- file size [%d]", __func__, webser->filesize );
 
-	// if file more than 50kb, will use sendfile
-	if( webser->filesize > 50000 ) {
-		send_file_flag  = 1;
-	}
-	if( send_file_flag ) {
+	// if not ssl, and file size more than 32768byte, will use sendfile
+	if( !webser->c->ssl_flag && webser->filesize > 32768  ) {
 		if( OK != meta_file_alloc( &webser->response_body,
 			webser->filesize ) ) {
 			err_log("%s --- meta file alloc", __func__ );
 			return ERROR;
 		}
 	} else {
-		if( OK != meta_alloc( &webser->response_body, webser->filesize ) ) {
+		( webser->filesize >= WEBSER_BODY_META_LENGTH ) ?
+		( read_length = WEBSER_BODY_META_LENGTH ) :
+		( read_length = webser->filesize );
+		if( OK != meta_alloc( &webser->response_body, read_length ) ) {
 			err_log( "%s --- meta alloc response_body", __func__ );
 			return ERROR;
 		}
+		webser->response_body->file_pos = 0;
+		webser->response_body->file_last = webser->filesize;
 		if( ERROR == read( webser->ffd, webser->response_body->last,
-			webser->filesize ) ) {
+			read_length ) ) {
 			err_log( "%s --- read file data, errno [%d] [%s]", __func__, errno,
 		 	strerror(errno) );
 			return ERROR;
 		}
-		webser->response_body->last = webser->response_body->pos +
-		webser->filesize;
-		close( webser->ffd );
-		webser->ffd = 0;
+		webser->response_body->last = webser->response_body->pos + read_length;
 	}
 	return OK;
 }
@@ -423,7 +450,8 @@ status webser_entity_head( webser_t * webser )
 	head_len += l_strlen("Accept-Charset: utf-8\r\n");
 
 	if( webser->request_head->headers_in.connection != NULL ) {
-		if( (uint32)webser->request_head->headers_in.connection->len > l_strlen("close") ) {
+		if( (uint32)webser->request_head->headers_in.connection->len >
+		l_strlen("close") ) {
 			head_len += l_strlen("Connection: keep-alive\r\n");
 		} else {
 			head_len += l_strlen("Connection: close\r\n");
@@ -446,7 +474,8 @@ status webser_entity_head( webser_t * webser )
 	l_strlen("Accept-Charset: utf-8\r\n") );
 	ptr += l_strlen("Accept-Charset: utf-8\r\n");
 	if( webser->request_head->headers_in.connection != NULL ) {
-		if( (uint32)webser->request_head->headers_in.connection->len > l_strlen("close") ) {
+		if( (uint32)webser->request_head->headers_in.connection->len >
+		l_strlen("close") ) {
 			memcpy( ptr, "Connection: keep-alive\r\n",
 			l_strlen("Connection: keep-alive\r\n") );
 			ptr += l_strlen("Connection: keep-alive\r\n");
@@ -477,7 +506,7 @@ static status webser_entity_start ( webser_t * webser )
 	uint32 length;
 
 	if( webser->request_head->method.len != l_strlen("GET") ||
- 	strncmp( webser->request_head->method.data, "GET", l_strlen("GET") ) != 0 ) {
+ 	strncmp( webser->request_head->method.data, "GET", l_strlen("GET") )!= 0 ) {
 		err_log("%s --- method not 'GET'", __func__ );
 		webser->re_status = 400;
 		return OK;
@@ -489,10 +518,10 @@ static status webser_entity_start ( webser_t * webser )
 	memcpy( ptr, conf.home.data, length );
 	ptr += length;
 
-	memcpy( ptr, webser->request_head->uri.data, webser->request_head->uri.len );
+	memcpy( ptr, webser->request_head->uri.data, webser->request_head->uri.len);
 	ptr += webser->request_head->uri.len;
 
-	if( webser->request_head->uri.data[webser->request_head->uri.len-1] == '/' ) {
+	if( webser->request_head->uri.data[webser->request_head->uri.len-1] =='/') {
 		memcpy( ptr, conf.index.data, conf.index.len );
 		ptr += conf.index.len;
 	}
@@ -610,7 +639,8 @@ static status webser_process( event_t * ev )
 		webser->request_body->cache = webser->api_flag ? 1 : 0;
 		webser->request_body->body_type = webser->request_head->body_type;
 		if( webser->request_head->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			webser->request_body->content_length = webser->request_head->content_length;
+			webser->request_body->content_length =
+				webser->request_head->content_length;
 		}
 		c->read->handler = webser_process_request_body;
 	}
