@@ -5,39 +5,32 @@ static queue_t 	usable;
 static webser_t * pool = NULL;
 
 // 400
-static string_t response_string_400 = string("\
-HTTP/1.1 400 Bad webser\r\n\
-Connection: Close\r\n\
-Server: lk-v1.0\r\n\
-Content-type: text/html\r\n\
-Content-Length: 80\r\n\r\n\
-<html><title>400 bad webser</title><body>\
-<h1>400 Bad webser</h1>\
-</body></html>\
-");
+static string_t response_string_400 = string("HTTP/1.1 400 Bad webser\r\n"
+"Connection: Close\r\n"
+"Server: lk-v1.0\r\n"
+"Content-type: text/html\r\n"
+"Content-Length: 78\r\n\r\n"
+"<html><title>400 bad webser</title><body>"
+"<h1>400 Bad webser</h1>"
+"</body></html>");
 // 403
-static string_t response_string_403 = string("\
-HTTP/1.1 403 Forbidden\r\n\
-Connection: Close\r\n\
-Server: lk-v1.0\r\n\
-Content-type: text/html\r\n\
-Content-Length: 76\r\n\r\n\
-<html><title>403 forbidden</title><body>\
-<h1>403 Forbidden</h1>\
-</body></html>\
-");
+static string_t response_string_403 = string("HTTP/1.1 403 Forbidden\r\n"
+"Connection: Close\r\n"
+"Server: lk-v1.0\r\n"
+"Content-type: text/html\r\n"
+"Content-Length: 76\r\n\r\n"
+"<html><title>403 forbidden</title><body>"
+"<h1>403 Forbidden</h1>"
+"</body></html>");
 // 404
-static string_t response_string_404 = string("\
-HTTP/1.1 404 Not Found\r\n\
-Connection: Close\r\n\
-Server: lk-v1.0\r\n\
-Content-type: text/html\r\n\
-Content-Length: 76\r\n\r\n\
-<html><title>404 not found</title><body>\
-<h1>404 Not Found</h1>\
-</body></html>\
-");
-
+static string_t response_string_404 = string("HTTP/1.1 404 Not Found\r\n"
+"Connection: Close\r\n"
+"Server: lk-v1.0\r\n"
+"Content-type: text/html\r\n"
+"Content-Length: 76\r\n\r\n"
+"<html><title>404 not found</title><body>"
+"<h1>404 Not Found</h1>"
+"</body></html>");
 
 static string_t default_mimetype =
 					string("Content-type: application/octet-stream\r\n");
@@ -291,7 +284,7 @@ static status webser_send_response( event_t * ev )
 	connection_t * c;
 	webser_t * webser;
 	uint32 read_length;
-	meta_t * cl;
+	meta_t * cl = NULL;
 
 	c = ev->data;
 	webser = c->data;
@@ -303,33 +296,36 @@ static status webser_send_response( event_t * ev )
 			return ERROR;
 		} else if( rc == DONE ) {
 			cl = webser->response_body;
-			if( webser->re_status == 200 ) {
+			if( cl ) {
 				cl->file_pos += meta_len( cl->start, cl->pos );
-			}
-			if( webser->re_status != 200 ||
-			( webser->re_status == 200 && ( cl->file_pos == cl->file_last) ) ) {
-				timer_del( &c->write->timer );
-				debug_log ( "%s --- success", __func__ );
-				if( webser->re_status == 200 &&
-					conf.http_keepalive &&
-					webser->request_head->keepalive_flag ) {
-					return webser_keepalive( webser );
-				}
-				return webser_over( webser );
-			} else {
-				cl->last = cl->pos = cl->start;
-				( ( cl->file_last - cl->file_pos) > WEBSER_BODY_META_LENGTH ) ?
-				( read_length = WEBSER_BODY_META_LENGTH ):
-				( read_length = ( cl->file_last - cl->file_pos) );
-				if( ERROR == read( webser->ffd, cl->last, read_length ) ) {
-					err_log( "%s --- read file data, errno [%d] [%s]", __func__,
-					errno, strerror(errno) );
+				if( cl->file_pos > cl->file_last ) {
+					err_log("%s --- file pos > file last", __func__ );
 					webser_over( webser );
 					return ERROR;
 				}
-				cl->last = cl->pos + read_length;
-				continue;
+				if( cl->file_pos < cl->file_last ) {
+					cl->last = cl->pos = cl->start;
+					((cl->file_last - cl->file_pos) > WEBSER_BODY_META_LENGTH )?
+					( read_length = WEBSER_BODY_META_LENGTH ):
+					( read_length = ( cl->file_last - cl->file_pos) );
+					if( ERROR == read( webser->ffd, cl->last, read_length ) ) {
+						err_log( "%s --- read file data, errno [%d] [%s]",
+						__func__, errno, strerror(errno) );
+						webser_over( webser );
+						return ERROR;
+					}
+					cl->last = cl->pos + read_length;
+					continue;
+				}
 			}
+			timer_del( &c->write->timer );
+			debug_log ( "%s --- success", __func__ );
+			if( webser->re_status == 200 &&
+				conf.http_keepalive &&
+				webser->request_head->keepalive_flag ) {
+				return webser_keepalive( webser );
+			}
+			return webser_over( webser );
 		}
 		c->write->timer.data = (void*)webser;
 		c->write->timer.handler = webser_time_out;
@@ -376,13 +372,17 @@ status webser_response( event_t * ev )
 {
 	connection_t* c;
 	webser_t * webser;
+	meta_t * cl;
 
 	c = ev->data;
 	webser = c->data;
 
 	if( webser->response_body ) {
-		debug_log ( "%s --- response_body [%p]", __func__,
-		webser->response_body );
+		for( cl = webser->response_body; cl; cl = cl->next ) {
+			if( cl->file_pos == 0 && cl->file_last == 0 ) {
+				cl->file_last = meta_len( cl->pos, cl->last );
+			}
+		}
 		webser->response_head->next = webser->response_body;
 	}
 	c->read->handler = webser_test_reading;
@@ -401,25 +401,22 @@ static status webser_entity_body( webser_t * webser )
 	 	strerror(errno) );
 		return ERROR;
 	}
-	debug_log ( "%s --- file size [%d]", __func__, webser->filesize );
-
-	// if not ssl, and file size more than 32768byte, will use sendfile
-	if( !webser->c->ssl_flag && webser->filesize > 32768  ) {
-		if( OK != meta_file_alloc( &webser->response_body,
-			webser->filesize ) ) {
+	if( !webser->c->ssl_flag && (webser->filesize > WEBSER_BODY_META_LENGTH) ) {
+		if( OK != meta_file_alloc( &webser->response_body, webser->filesize ) ){
 			err_log("%s --- meta file alloc", __func__ );
 			return ERROR;
 		}
 	} else {
-		( webser->filesize >= WEBSER_BODY_META_LENGTH ) ?
-		( read_length = WEBSER_BODY_META_LENGTH ) :
-		( read_length = webser->filesize );
+		read_length = l_min( webser->filesize, WEBSER_BODY_META_LENGTH );
 		if( OK != meta_alloc( &webser->response_body, read_length ) ) {
 			err_log( "%s --- meta alloc response_body", __func__ );
 			return ERROR;
 		}
 		webser->response_body->file_pos = 0;
 		webser->response_body->file_last = webser->filesize;
+		/*
+			did't adjust file offset yet, only support sequential reading
+		*/
 		if( ERROR == read( webser->ffd, webser->response_body->last,
 			read_length ) ) {
 			err_log( "%s --- read file data, errno [%d] [%s]", __func__, errno,

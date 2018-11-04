@@ -255,12 +255,10 @@ status ssl_write_chain( connection_t * c, meta_t * meta )
 
 	cl = meta;
 	while(1) {
-		while( cl ) {
-			if( meta_len( cl->pos, cl->last ) < 1 ) {
-				cl = cl->next;
-				continue;
+		for( cl = meta; cl; cl = cl->next ) {
+			if( meta_len( cl->pos, cl->last ) ) {
+				break;
 			}
-			break;
 		}
 		if( !cl ) {
 			return DONE;
