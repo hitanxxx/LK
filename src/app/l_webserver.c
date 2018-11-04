@@ -5,7 +5,7 @@ static queue_t 	usable;
 static webser_t * pool = NULL;
 
 // 400
-static string_t response_string_400 = string("HTTP/1.1 400 Bad webser\r\n"
+static string_t response_string_400 = string("HTTP/1.1 400 Bad Request\r\n"
 "Connection: Close\r\n"
 "Server: lk-v1.0\r\n"
 "Content-type: text/html\r\n"

@@ -11,48 +11,45 @@ Vue.component('model', {
 	<h2 class="title">新增/修改</h2>
 		<div class="overlay_content">
 			<table>
-			
+
 			<tr>
 				<td>https</td>
 				<td>
-					<select name="" id="" v-model="modifylist.https">
-					<option value=true >yes</option>
-					<option value=false >no</option>
-					</select>
+				<input type="checkbox" id="" v-model="modifylist.https">
+				<label for="checkbox">{{ modifylist.https }}</label>
 				</td>
 			</tr>
-			
-			
+
+
 			<tr>
 				<td>用例地址</td>
 				<td><input type="text" maxlength="30" v-model="modifylist.ip"></td>
 			</tr>
-			
+
 			<tr>
 				<td>用例端口</td>
 				<td><input type="text" maxlength="5" v-model.number="modifylist.port"></td>
 			</tr>
-	
+
 			<tr>
 				<td>method</td>
 				<td>
 					<select name="" id="" v-model="modifylist.method">
 					<option value="GET">get</option>
-					<option value="POST">post</option>
 					</select>
 				</td>
 			</tr>
-			
+
 			<tr>
 				<td>uri</td>
 				<td><input type="text" maxlength="1024" v-model="modifylist.uri"></td>
 			</tr>
-			
+
 			<tr>
 				<td>host</td>
 				<td><input type="text" maxlength="30" v-model="modifylist.host"></td>
 			</tr>
-			
+
 			</table>
 		<p>
 		<input type="button" @click="modify" value="保存">
@@ -75,8 +72,8 @@ Vue.component('model', {
 		}
 	}
 });
-	
-	
+
+
 app = new Vue({
 	el: '#app',
 	data: {
@@ -111,7 +108,7 @@ app = new Vue({
 				alert("Please check your network...");
 			});
 		},
-		
+
 		add: function () {
 			this.selectedlist = {
 				index: 0,
@@ -124,15 +121,15 @@ app = new Vue({
 			};
 			this.isActive = true;
 		},
-		
+
 		showOverlay(index) {
 			this.selected = index;
 			this.selectedlist = this.list[index];
 			this.changeOverlay();
 		},
-		
+
 		modify(arr) {
-			
+
 			if (this.selected > -1) {
 				arr.index = this.selected+1;
 				Vue.set(this.list, this.selected, arr);
@@ -143,21 +140,21 @@ app = new Vue({
 			this.setSlist(this.list);
 			this.changeOverlay();
 		},
-		
+
 		del(index) {
 			this.list.splice(index, 1);
 			this.setSlist(this.list);
 		},
-		
+
 		changeOverlay( ) {
 			this.isActive = !this.isActive;
 		},
-		
+
 		setSlist(arr) {
 			this.slist = JSON.parse(JSON.stringify(arr));
 		}
 	},
 	watch: {
-		
+
 	}
 })

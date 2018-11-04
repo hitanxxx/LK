@@ -252,6 +252,9 @@ static status perf_recv_header ( event_t * ev )
 		__sync_fetch_and_add( &perform_recvs[p->pipeline_index],
 			meta_len( p->response_head->head.pos, p->response_head->head.last ) );
 
+		debug_log("%s --- head [%.*s]", __func__,
+	 	meta_len( p->response_head->head.pos, p->response_head->head.last ),
+	 	p->response_head->head.pos );
 		// no body, goto perf again
 		if(	p->response_head->body_type == HTTP_ENTITYBODY_NULL ) {
 			return perf_over( p, OK );
@@ -316,101 +319,116 @@ static status perf_send( event_t * ev )
 // perf_send_prepare_request ------------
 static status perf_send_prepare_request( perform_pipeline_t * pipeline )
 {
-	uint32 len = 0;
-	char * ptr;
+	uint32 request_length = 0;
+	char * p;
 
-	// ---
-	len += pipeline->method.len;
-	len += l_strlen(" ");
-	len += pipeline->uri.len;
-	len += l_strlen(" HTTP/1.1\r\n");
-	// ---
-	len += l_strlen("Host: ");
-	len += pipeline->host.len;
-	len += l_strlen("\r\n");
-	// ---
-	len += l_strlen("User-Agent: lk-perf-v1\r\n");
-	// ---
+	// method uri HTTP/1.1\r\n
+	request_length += pipeline->method.len;
+	request_length += pipeline->uri.len;
+	request_length += l_strlen("  HTTP/1.1\r\n");
+	// Host: host\r\n
+	request_length += l_strlen("Host: \r\n");
+	request_length += pipeline->host.len;
+	// User-Agent: lk-perf-v1\r\n
+	request_length += l_strlen("User-Agent: lk-perf-v1\r\n");
+	// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n
+	request_length += l_strlen("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n");
+	// Accept-Encoding: deflate\r\n
+	request_length += l_strlen("Accept-Encoding: deflate\r\n");
+	// Accept-Language: zh-CN,zh;q=0.9\r\n
+	request_length += l_strlen("Accept-Language: zh-CN,zh;q=0.9\r\n");
+	// Connection: Close/Keep-Alive\r\n
 	if( perf_settings.keepalive ) {
-		len += l_strlen("Connection: Keep-Alive\r\n");
+		request_length += l_strlen("Connection: Keep-Alive\r\n");
 	} else {
-		len += l_strlen("Connection: Close\r\n");
+		request_length += l_strlen("Connection: Close\r\n");
 	}
-	len += l_strlen("\r\n");
+	// \r\n
+	request_length += l_strlen("\r\n");
 	// body part
 	if( pipeline->method.len == l_strlen("post") ) {
 		if( strncmp( pipeline->method.data, "post", l_strlen("post") ) == 0 ||
 			strncmp( pipeline->method.data, "POST", l_strlen("POST") ) == 0 ) {
 			if( pipeline->body.len > 0 ) {
-				len += pipeline->body.len;
+				request_length += pipeline->body.len;
 			}
 		}
 	} else if ( pipeline->method.len == l_strlen("put") ) {
 		if( strncmp( pipeline->method.data, "put", l_strlen("put") ) == 0 ||
 			strncmp( pipeline->method.data, "PUT", l_strlen("PUT") ) == 0  ) {
 			if( pipeline->body.len > 0 ) {
-				len += pipeline->body.len;
+				request_length += pipeline->body.len;
 			}
 		}
 	}
 
-	if( OK != meta_alloc( &pipeline->request_meta, len ) ) {
+	if( OK != meta_alloc( &pipeline->request_meta, request_length ) ) {
 		err_log(  "%s --- new alloc error", __func__ );
 		return ERROR;
 	}
-	ptr = pipeline->request_meta->data;
-	// ---
-	memcpy( ptr, pipeline->method.data, pipeline->method.len );
-	ptr += pipeline->method.len;
-	memcpy( ptr, " ", l_strlen(" ") );
-	ptr += l_strlen(" ");
-	memcpy( ptr, pipeline->uri.data, pipeline->uri.len );
-	ptr += pipeline->uri.len;
-	memcpy( ptr, " HTTP/1.1\r\n", l_strlen(" HTTP/1.1\r\n") );
-	ptr += l_strlen(" HTTP/1.1\r\n");
-	// ---
-	memcpy( ptr, "Host: ", l_strlen("Host: ") );
-	ptr += l_strlen("Host: ");
-	memcpy( ptr, pipeline->host.data, pipeline->host.len );
-	ptr += pipeline->host.len;
-	memcpy( ptr, "\r\n", l_strlen("\r\n") );
-	ptr += l_strlen("\r\n");
-	// ---
-	memcpy( ptr, "User-Agent: lk-perf-v1\r\n",
+	p = pipeline->request_meta->data;
+	// method uri HTTP/1.1\r\n
+	memcpy( p, pipeline->method.data, pipeline->method.len );
+	p += pipeline->method.len;
+	memcpy( p, " ", l_strlen(" ") );
+	p += l_strlen(" ");
+	memcpy( p, pipeline->uri.data, pipeline->uri.len );
+	p += pipeline->uri.len;
+	memcpy( p, " HTTP/1.1\r\n", l_strlen(" HTTP/1.1\r\n") );
+	p += l_strlen(" HTTP/1.1\r\n");
+	// Host: host\r\n
+	memcpy( p, "Host: ", l_strlen("Host: ") );
+	p += l_strlen("Host: ");
+	memcpy( p, pipeline->host.data, pipeline->host.len );
+	p += pipeline->host.len;
+	memcpy( p, "\r\n", l_strlen("\r\n") );
+	p += l_strlen("\r\n");
+	// User-Agent: lk-perf-v1\r\n
+	memcpy( p, "User-Agent: lk-perf-v1\r\n",
 	l_strlen("User-Agent: lk-perf-v1\r\n") );
-	ptr += l_strlen("User-Agent: lk-perf-v1\r\n");
-	// ---
+	p += l_strlen("User-Agent: lk-perf-v1\r\n");
+	// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n
+	memcpy( p, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n",
+ 	l_strlen("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n"));
+	p += l_strlen("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\n");
+	// Accept-Encoding: deflate\r\n
+	memcpy( p, "Accept-Encoding: deflate\r\n", l_strlen("Accept-Encoding: deflate\r\n") );
+	p += l_strlen("Accept-Encoding: deflate\r\n");
+	// Accept-Language: zh-CN,zh;q=0.9\r\n
+	memcpy( p, "Accept-Language: zh-CN,zh;q=0.9\r\n", l_strlen("Accept-Language: zh-CN,zh;q=0.9\r\n") );
+	p += l_strlen("Accept-Language: zh-CN,zh;q=0.9\r\n");
+	// Connection: Close/Keep-Alive\r\n
 	if( perf_settings.keepalive ) {
-		memcpy( ptr, "Connection: Keep-Alive\r\n",
+		memcpy( p, "Connection: Keep-Alive\r\n",
 		l_strlen("Connection: Keep-Alive\r\n") );
-		ptr += l_strlen("Connection: Keep-Alive\r\n");
+		p += l_strlen("Connection: Keep-Alive\r\n");
 	} else {
-		memcpy( ptr, "Connection: Close\r\n",
+		memcpy( p, "Connection: Close\r\n",
 		l_strlen("Connection: Close\r\n") );
-		ptr += l_strlen("Connection: Close\r\n");
+		p += l_strlen("Connection: Close\r\n");
 	}
 	// ---
-	memcpy( ptr, "\r\n", l_strlen("\r\n") );
-	ptr += l_strlen("\r\n");
+	memcpy( p, "\r\n", l_strlen("\r\n") );
+	p += l_strlen("\r\n");
 
 	if( pipeline->method.len == l_strlen("post") ) {
 		if( strncmp( pipeline->method.data, "post", l_strlen("post") ) == 0 ||
 	strncmp( pipeline->method.data, "POST", l_strlen("POST") ) == 0 ) {
 			if( pipeline->body.len > 0 ) {
-				memcpy( ptr, pipeline->body.data, pipeline->body.len );
-				ptr += pipeline->body.len;
+				memcpy( p, pipeline->body.data, pipeline->body.len );
+				p += pipeline->body.len;
 			}
 		}
 	} else if ( pipeline->method.len == l_strlen("put") ) {
 		if( strncmp( pipeline->method.data, "put", l_strlen("put") ) == 0 ||
 	strncmp( pipeline->method.data, "PUT", l_strlen("PUT") ) == 0 ) {
 			if( pipeline->body.len > 0 ) {
-				memcpy( ptr, pipeline->body.data, pipeline->body.len );
-				ptr += pipeline->body.len;
+				memcpy( p, pipeline->body.data, pipeline->body.len );
+				p += pipeline->body.len;
 			}
 		}
 	}
-	pipeline->request_meta->last += len;
+	pipeline->request_meta->last = p;
 	return OK;
 }
 // perf_send_prepare ---------------
@@ -433,6 +451,9 @@ static status perf_send_prepare( event_t * ev )
 	p->send_chain.pos = p->pipeline->request_meta->pos;
 	p->send_chain.last = p->pipeline->request_meta->last;
 	p->send_n = meta_len( p->send_chain.pos, p->send_chain.last );
+	debug_log("%s --- meta [%.*s]", __func__,
+ 	meta_len( p->send_chain.pos, p->send_chain.last ),
+ 	p->send_chain.pos );
 
 	c->write->handler = perf_send;
 	return c->write->handler( c->write );
@@ -494,6 +515,7 @@ static status perf_connect_check ( event_t * ev )
 	}
 	debug_log(  "%s --- connect success", __func__ );
 
+	debug_log("%s --- https flag [%d]", __func__, p->pipeline->https );
 	if( p->pipeline->https ) {
 		c->ssl_flag = 1;
 		if( OK != ssl_create_connection( c, L_SSL_CLIENT ) ) {
@@ -849,11 +871,11 @@ static status performance_setting_init( json_t * json )
 	json_get_obj_bool( t, "keepalive", l_strlen("keepalive"), &x );
 	perf_settings.keepalive = (x->type == JSON_TRUE) ? 1 : 0;
 
-	debug_log(  "%s --- perf_setting_time_n 	[%d]",
+	debug_log(  "%s --- perf_setting_time_n	[%d]",
 	__func__, perf_settings.running_time_sec );
-	debug_log(  "%s --- perf_setting_concurrent_n 	[%d]",
+	debug_log(  "%s --- perf_setting_concurrent_n	[%d]",
 	__func__, perf_settings.concurrent );
-	debug_log(  "%s --- perf_setting_keepalive_bool 	[%d]",
+	debug_log(  "%s --- perf_setting_keepalive_bool	[%d]",
 	__func__, perf_settings.keepalive );
 
 	json_get_obj_arr( t, "pipeline", l_strlen("pipeline"), &x );
@@ -866,9 +888,9 @@ static status performance_setting_init( json_t * json )
 		json_get_obj_num( t, "index", l_strlen("index"), &v );
 		pipeline->index = (uint32)v->num;
 		json_get_obj_bool( t, "https", l_strlen("https"), &v );
-		pipeline->https = ( v->num == JSON_TRUE ) ? 1 : 0;
+		https = (v->type == JSON_TRUE ) ? 1 : 0;
 		json_get_obj_num( t, "port", l_strlen("port"), &v );
-		pipeline->port = (uint32)v->num;
+		port = (uint32)v->num;
 		json_get_obj_str( t, "ip", l_strlen("ip"), &v );
 		ip.data = v->name.data;
 		ip.len = v->name.len;
@@ -882,16 +904,18 @@ static status performance_setting_init( json_t * json )
 		uri.data = v->name.data;
 		uri.len = v->name.len;
 
-		if( OK == performance_setting_repeat( pipeline->https,
+		if( OK == performance_setting_repeat( https,
 			&ip,
-			pipeline->port,
+			port,
 		 	&method,
 			&uri,
 			&host ) ) {
 			err_log(  "%s --- perform setting data reapeat", __func__ );
 			return ERROR;
 		}
-		// ---
+		// give value
+		pipeline->https = https;
+		pipeline->port = port;
 		pipeline->ip.len = ip.len;
 		pipeline->ip.data = (char*)malloc( pipeline->ip.len );
 		if( !pipeline->ip.data ) {
@@ -931,13 +955,15 @@ static status performance_setting_init( json_t * json )
 		memcpy( pipeline->uri.data, uri.data, uri.len );
 		// ---
 		debug_log(  "%s -------------------", __func__ );
-		debug_log(  "%s --- ip		[%.*s]", __func__,
+		debug_log( "%s --- https [%d]", __func__,
+	 	pipeline->https );
+		debug_log(  "%s --- ip	[%.*s]", __func__,
 		pipeline->ip.len, pipeline->ip.data );
 		debug_log(  "%s --- port	[%d]", 	 __func__,
 		pipeline->port );
 		debug_log(  "%s --- host	[%.*s]", __func__,
 		pipeline->host.len, pipeline->host.data );
-		debug_log(  "%s --- uri		[%.*s]", __func__,
+		debug_log(  "%s --- uri	[%.*s]", __func__,
 		pipeline->uri.len, pipeline->uri.data );
 		debug_log(  "%s --- method	[%.*s]", __func__,
 		pipeline->method.len, pipeline->method.data );
