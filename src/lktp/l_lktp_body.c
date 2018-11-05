@@ -162,9 +162,9 @@ status lktp_body_init( void )
 
     queue_init( &usable );
     queue_init( &in_use );
-    pool = ( lktp_body_t * ) malloc( sizeof(lktp_body_t)*MAXCON );
+    pool = ( lktp_body_t * ) l_safe_malloc( sizeof(lktp_body_t)*MAXCON );
     if( !pool ) {
-        err_log("%s --- malloc pool", __func__ );
+        err_log("%s --- l_safe_malloc pool", __func__ );
         return ERROR;
     }
     memset( pool, 0, sizeof(lktp_body_t)*MAXCON );

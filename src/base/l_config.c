@@ -52,6 +52,10 @@ static status config_parse_global( json_t * json )
 	}
 	if ( OK == json_get_obj_num(root_obj, "worker_process", l_strlen("worker_process"), &v ) ) {
 		conf.worker_process = (uint32)v->num;
+		if( conf.worker_process > MAXPROCESS ) {
+			err_log("%s --- work_procrss too much, [%d]", __func__, conf.worker_process );
+			return ERROR;
+		}
 	}
 	if( OK == json_get_obj_bool(root_obj, "reuse_port", l_strlen("reuse_port"), &v ) ) {
 		conf.reuse_port = (v->type == JSON_TRUE) ? 1 : 0;

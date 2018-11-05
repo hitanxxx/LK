@@ -1,9 +1,10 @@
 #include "lk.h"
 
-sig_atomic_t		sig_quit = 0;
-sig_atomic_t		sig_reap = 0;
-sig_atomic_t 		sig_perf = 0;
-sig_atomic_t		sig_perf_stop = 0;
+int32			global_signal = 0;
+sig_atomic_t	sig_quit = 0;
+sig_atomic_t	sig_reap = 0;
+sig_atomic_t 	sig_perf = 0;
+sig_atomic_t	sig_perf_stop = 0;
 
 // l_signal_child_status -------------------
 static void l_signal_child_status( void )
@@ -14,20 +15,29 @@ static void l_signal_child_status( void )
 	for( ;; ) {
 		pid = waitpid( -1, NULL, WNOHANG );
 		if( pid == 0 ) {
+			// no child died...
 			return;
 		}
 		if( pid == -1 ) {
-			if( errno == EINTR ) continue;
-
+			if( errno == EINTR ) {
+				// stop by signal, continue
+				continue;
+			}
 			return;
 		}
 		for( i = 0; i < process_num; i ++ ) {
 			if( process_arr[i].pid == pid ) {
-				err_log("%s --- child [%d] died", __func__, pid );
 				process_arr[i].exiting = 0;
 				process_arr[i].exited = 1;
 				break;
 			}
+		}
+	}
+	// unlock accept mutex if accept mutex on and dead process using
+	if( !conf.perf_switch && conf.accept_mutex &&
+		!conf.reuse_port && process_num > 1 ) {
+		if( accept_mutex_user && ( accept_mutex_user == pid ) ) {
+			__sync_fetch_and_add( &accept_mutex, 1 );
 		}
 	}
 	return;
@@ -35,6 +45,14 @@ static void l_signal_child_status( void )
 // l_signal_handler --------------------------
 static void l_signal_handler( int32 lsignal )
 {
+	int32 errno_cache;
+	/*
+		signal handler don't change anything, and will be return immediately.
+		so don't need any mutex lock.
+	*/
+
+	errno_cache = errno;
+	global_signal = lsignal;
 	if( process_id == 0xffff ) {
 		if( lsignal == SIGINT || lsignal == SIGHUP ) {
 			sig_quit = 1;
@@ -50,12 +68,13 @@ static void l_signal_handler( int32 lsignal )
 			sig_perf_stop = 1;
 		}
 	}
-	
+
 	if( lsignal == SIGCHLD ) {
 		if( process_id == 0xffff ) {
 			l_signal_child_status( );
 		}
 	}
+	errno = errno_cache;
 	return;
 }
 // l_signal_init --------------------

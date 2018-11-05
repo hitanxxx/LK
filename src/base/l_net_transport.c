@@ -61,7 +61,7 @@ static status net_transport_recv( net_transport_t * t )
 		if( !t->recv_meta ||
 			t->recv_meta->last == t->recv_meta->end ) {
 			if( OK != meta_alloc( &new, NET_TRANSPORT_BUFFER_SIZE ) ) {
-				err_log(  "%s --- malloc new", __func__ );
+				err_log(  "%s --- l_safe_malloc new", __func__ );
 				return ERROR;
 			}
 			t->recv_time ++;
@@ -123,9 +123,9 @@ status net_transport_alloc( net_transport_t ** t )
 {
 	net_transport_t * new = NULL;
 
-	new = (net_transport_t*)malloc( sizeof(net_transport_t) );
+	new = (net_transport_t*)l_safe_malloc( sizeof(net_transport_t) );
 	if( !new ) {
-		err_log(  "%s --- malloc new", __func__ );
+		err_log(  "%s --- l_safe_malloc new", __func__ );
 		return ERROR;
 	}
 	memset( new, 0, sizeof(net_transport_t) );

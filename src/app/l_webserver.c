@@ -52,8 +52,8 @@ static mime_type_t mimetype_table[] =
 };
 
 static status webser_process_request( event_t * ev );
-status webser_over( webser_t * webser );
 static status webser_over_early( webser_t * webser, uint32 status_code);
+status webser_over( webser_t * webser );
 
 // webser_set_mimetype --------------------
 status webser_set_mimetype( webser_t * webser, char * str, uint32 length )
@@ -262,9 +262,9 @@ static status webser_over_early( webser_t * webser, uint32 status_code)
 		webser_over( webser );
 		return ERROR;
 	}
-	meta = (meta_t*)malloc( sizeof(meta_t) );
+	meta = (meta_t*)l_safe_malloc( sizeof(meta_t) );
 	if( !meta ) {
-		err_log("%s --- malloc meta", __func__ );
+		err_log("%s --- l_safe_malloc meta", __func__ );
 		webser_over( webser );
 		return ERROR;
 	}
@@ -309,8 +309,8 @@ static status webser_send_response( event_t * ev )
 					( read_length = WEBSER_BODY_META_LENGTH ):
 					( read_length = ( cl->file_last - cl->file_pos) );
 					if( ERROR == read( webser->ffd, cl->last, read_length ) ) {
-						err_log( "%s --- read file data, errno [%d] [%s]",
-						__func__, errno, strerror(errno) );
+						err_log( "%s --- read file data, errno [%d]",
+						__func__, errno );
 						webser_over( webser );
 						return ERROR;
 					}
@@ -397,8 +397,7 @@ static status webser_entity_body( webser_t * webser )
 
 	webser->ffd = open( webser->filepath, O_RDONLY );
 	if( webser->ffd == ERROR ) {
-		err_log( "%s --- open file, errno [%d] [%s]", __func__, errno,
-	 	strerror(errno) );
+		err_log( "%s --- open request file, errno [%d]", __func__, errno );
 		return ERROR;
 	}
 	if( !webser->c->ssl_flag && (webser->filesize > WEBSER_BODY_META_LENGTH) ) {
@@ -415,12 +414,11 @@ static status webser_entity_body( webser_t * webser )
 		webser->response_body->file_pos = 0;
 		webser->response_body->file_last = webser->filesize;
 		/*
-			did't adjust file offset yet, only support sequential reading
+			did't adjust file offset yet, only can sequential reading
 		*/
 		if( ERROR == read( webser->ffd, webser->response_body->last,
 			read_length ) ) {
-			err_log( "%s --- read file data, errno [%d] [%s]", __func__, errno,
-		 	strerror(errno) );
+			err_log( "%s --- read request file, errno [%d]", __func__, errno );
 			return ERROR;
 		}
 		webser->response_body->last = webser->response_body->pos + read_length;
@@ -524,8 +522,7 @@ static status webser_entity_start ( webser_t * webser )
 	}
 	// end of rewrite path
 	if( OK != stat( webser->filepath, &st ) ) {
-		err_log("%s --- stat, errno [%d] [%s]", __func__, errno,
-		strerror(errno) );
+		err_log("%s --- stat request file, errno [%d]", __func__, errno );
 		webser->re_status = 400;
 		return OK;
 	}
@@ -762,9 +759,9 @@ status webser_process_init( void )
 
 	queue_init( &use );
 	queue_init( &usable );
-	pool = ( webser_t *) malloc ( sizeof(webser_t) * MAXCON );
+	pool = ( webser_t *) l_safe_malloc( sizeof(webser_t) * MAXCON );
 	if( !pool ) {
-		err_log( "%s --- malloc pool", __func__ );
+		err_log( "%s --- l_safe_malloc pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(webser_t) * MAXCON );

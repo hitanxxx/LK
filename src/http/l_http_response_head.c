@@ -440,9 +440,9 @@ status http_response_head_init_module ( void )
 	queue_init( &in_use );
 	queue_init( &usable );
 
-	pool = (http_response_head_t*)malloc( sizeof(http_response_head_t)* MAXCON );
+	pool = (http_response_head_t*)l_safe_malloc( sizeof(http_response_head_t)* MAXCON );
 	if( !pool ) {
-		err_log(  "%s --- malloc pool", __func__ );
+		err_log(  "%s --- l_safe_malloc pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(http_response_head_t)*MAXCON );

@@ -188,8 +188,7 @@ ssize_t ssl_read( connection_t * c, char * start, uint32 len )
 		return AGAIN;
 	}
 	if( sslerr == SSL_ERROR_SYSCALL ) {
-		err_log("%s --- ssl error, syscall [%d] [%s]", __func__,
-	  	errno, strerror( errno ) );
+		err_log("%s --- ssl error, syserror [%d]", __func__, errno );
 	} else {
 		err_log("%s --- ssl error, ssl fault", __func__ );
 	}
@@ -232,8 +231,7 @@ ssize_t ssl_write( connection_t * c, char * start, uint32 len )
 		return AGAIN;
 	}
 	if( sslerr == SSL_ERROR_SYSCALL ) {
-		err_log("%s --- ssl error, syscall [%d] [%s]", __func__,
-	  	errno, strerror( errno ) );
+		err_log("%s --- ssl error, syserror [%d]", __func__, errno );
 	} else {
 		err_log("%s --- ssl error, ssl fault", __func__ );
 	}
@@ -280,9 +278,9 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 	ssl_connection_t * sc = NULL;
 	SSL_CTX * ctx;
 
-	sc = (ssl_connection_t*)malloc( sizeof(ssl_connection_t) );
+	sc = (ssl_connection_t*)l_safe_malloc( sizeof(ssl_connection_t) );
 	if( !sc ) {
-		err_log ( "%s --- malloc sc", __func__ );
+		err_log ( "%s --- l_safe_malloc sc", __func__ );
 		return ERROR;
 	}
 	memset( sc, 0, sizeof(ssl_connection_t) );

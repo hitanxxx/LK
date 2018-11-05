@@ -511,6 +511,7 @@ static status http_request_head_process_request_line( http_request_head_t * requ
 				err_log("%s --- uri too long", __func__ );
 				return ERROR;
 			}
+			request->request_line_start = c->meta->start;
 			request->handler = http_request_head_process_headers;
 			return request->handler( request );
 		} else if( rc == ERROR ) {
@@ -568,6 +569,7 @@ status http_request_head_free( http_request_head_t * request )
 	request->handler = NULL;
 	request->state = 0;
 
+	request->request_line_start = NULL;
 	request->request_line_end = NULL;
 	request->method.data = NULL;
 	request->method.len = 0;
@@ -604,9 +606,9 @@ status http_request_head_init_module( void )
 
 	queue_init( &in_use );
 	queue_init( &usable );
-	pool = (http_request_head_t*)malloc( sizeof(http_request_head_t)*MAXCON );
+	pool = (http_request_head_t*)l_safe_malloc( sizeof(http_request_head_t)*MAXCON );
 	if( !pool ) {
-		err_log("%s --- malloc request pool", __func__ );
+		err_log("%s --- l_safe_malloc request pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(http_request_head_t)*MAXCON );

@@ -65,7 +65,7 @@ status net_fastopen( connection_t * c )
 
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_FASTOPEN,
 			(const void *) &tcp_fastopen, sizeof(tcp_fastopen)) ) {
-		err_log( "%s --- set fastopen, [%s]", __func__, strerror(errno) );
+		err_log( "%s --- fastopen failed, [%d]", __func__, errno );
 		return ERROR;
 	}
 	return OK;
@@ -77,7 +77,7 @@ status net_nodelay( connection_t * c )
 
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
 			(const void *) &tcp_nodelay, sizeof(tcp_nodelay)) ) {
-		err_log( "%s --- set nodelay, [%s]", __func__, strerror(errno) );
+		err_log( "%s --- nodelay failed, [%d]", __func__, errno );
 		return ERROR;
 	}
 	return OK;
@@ -89,7 +89,7 @@ status net_nopush( connection_t * c )
 
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_CORK,
 			(const void *) &tcp_cork, sizeof(tcp_cork)) ) {
-		err_log( "%s --- set nopush, [%s]", __func__, strerror(errno) );
+		err_log( "%s --- nopush failed, [%d]", __func__, errno );
 		return ERROR;
 	}
 	return OK;
@@ -111,11 +111,11 @@ struct addrinfo * net_get_addr( string_t * ip, string_t * port )
 
 	rc = getaddrinfo( name, serv, &hints, &res );
 	if( 0 != rc ) {
-		err_log( "%s --- getaddrinfo error", __func__ );
+		err_log( "%s --- getaddrinfo failed, [%d]", __func__, errno );
 		return NULL;
 	}
 	if( NULL == res ) {
-		err_log( "%s --- getaddrinfo empty", __func__ );
+		err_log( "%s --- getaddrinfo failed, [%d]", __func__, errno );
 		return NULL;
 	}
 	return res;
@@ -128,23 +128,23 @@ status net_init( void )
 	queue_init( &usable );
 	queue_init( &use );
 
-	pool = ( connection_t *) malloc ( sizeof(connection_t) * MAXCON );
+	pool = ( connection_t *) l_safe_malloc ( sizeof(connection_t) * MAXCON );
 	if( !pool ) {
-		err_log( "%s --- malloc pool", __func__ );
+		err_log( "%s --- l_safe_malloc pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(connection_t) * MAXCON );
 
-	read_pool = (event_t*)malloc( sizeof(event_t)* MAXCON );
+	read_pool = (event_t*)l_safe_malloc( sizeof(event_t)* MAXCON );
 	if( !read_pool ) {
-		err_log( "%s --- malloc read pool", __func__ );
+		err_log( "%s --- l_safe_malloc read pool", __func__ );
 		return ERROR;
 	}
 	memset( read_pool, 0, sizeof(event_t)*MAXCON );
 
-	write_pool = (event_t*)malloc( sizeof(event_t)*MAXCON );
+	write_pool = (event_t*)l_safe_malloc( sizeof(event_t)*MAXCON );
 	if( !write_pool ) {
-		err_log( "%s --- malloc write pool", __func__ );
+		err_log( "%s --- l_safe_malloc write pool", __func__ );
 		return ERROR;
 	}
 	memset( write_pool, 0, sizeof(event_t)*MAXCON );

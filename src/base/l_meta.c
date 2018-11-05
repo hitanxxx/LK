@@ -5,7 +5,7 @@ status meta_file_alloc( meta_t ** meta, uint32 length )
 {
 	meta_t * new = NULL;
 
-	new = (meta_t*)malloc( sizeof(meta_t) );
+	new = (meta_t*)l_safe_malloc( sizeof(meta_t) );
 	if( !new ) {
 		return ERROR;
 	}
@@ -26,7 +26,7 @@ status meta_alloc( meta_t ** meta, uint32 size )
 {
 	meta_t * new = NULL;
 
-	new = (meta_t*)malloc( sizeof(meta_t) );
+	new = (meta_t*)l_safe_malloc( sizeof(meta_t) );
 	if( !new ) {
 		return ERROR;
 	}
@@ -34,7 +34,7 @@ status meta_alloc( meta_t ** meta, uint32 size )
 	new->data = NULL;
 	new->next = NULL;
 
-	new->data = (char*)malloc( size*sizeof(char) );
+	new->data = (char*)l_safe_malloc( size*sizeof(char) );
 	if( !new->data ) {
 		free( new );
 		return ERROR;

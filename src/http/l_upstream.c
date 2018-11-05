@@ -38,7 +38,7 @@ status upstream_alloc( upstream_t ** up )
 {
 	upstream_t * new = NULL;
 
-	new = (upstream_t*)malloc( sizeof( upstream_t ));
+	new = (upstream_t*)l_safe_malloc( sizeof( upstream_t ));
 	if( !new ) {
 		err_log ( "%s --- new null", __func__ );
 		return ERROR;
@@ -207,7 +207,7 @@ static status upstream_make_webser( upstream_t * up, meta_t ** meta )
 	len += l_strlen("\r\n");
 
 	if( OK != meta_alloc( &new, (uint32)len ) ) {
-		err_log ( "%s --- malloc meta new", __func__ );
+		err_log ( "%s --- l_safe_malloc meta new", __func__ );
 		return ERROR;
 	}
 

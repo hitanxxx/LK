@@ -17,10 +17,9 @@ typedef struct process_t {
 extern process_t process_arr[MAXPROCESS];
 
 process_t * process_get_run( void );
-
-status process_init( void );
-status process_end( void );
-
-status process_master_run( void );
+void process_master_run( void );
 void process_single_run( void );
+
+status process_end( void );
+status process_init( void );
 #endif

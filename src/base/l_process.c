@@ -19,65 +19,41 @@ static status process_broadcast_child( int32 lsignal )
 
 	for( i = 0; i < process_num; i ++ ) {
 		if( ERROR == kill( process_arr[i].pid, lsignal ) ) {
-			err_log( "%s --- kill signal [%d] child", __func__, signal );
+			err_log( "%s --- broadcast signal [%d] failed, [%d]", __func__,
+			lsignal, errno );
 		}
 		process_arr[i].exiting = 1;
 	}
 	return OK;
 }
-// process_perf_stop ----------
-static void process_perf_stop ( void  )
-{
-	performance_process_stop( NULL );
-}
-// process_perf_start -------------
-static void process_perf_start ( void )
-{
-	meta_t * t;
-	json_t * json;
-
-	if( OK != config_get( &t, L_PATH_PERFTEMP ) ) {
-		err_log( "%s --- get perf data", __func__ );
-		return;
-	}
-	if( OK != json_decode( &json, t->pos, t->last ) ) {
-		err_log( "%s --- json decode", __func__ );
-		meta_free( t );
-		return;
-	}
-	performance_process_start( (void*)json );
-	json_free( json );
-	meta_free( t );
-	return;
-}
 // process_worker_end ------------------
 static void process_worker_end( void )
 {
+	err_log( "%s --- worker process exiting", __func__ );
 	dynamic_module_end( );
-	debug_log( "%s --- worker process exiting", __func__ );
 	exit(0);
 }
 // process_worker_run -------------------
 static void process_worker_run( void )
 {
 	int32 timer;
-	sigset_t    set;
+	sigset_t set;
 
 	sigemptyset( &set );
 	sigprocmask( SIG_SETMASK, &set, NULL );
-
 	dynamic_module_init( );
-	while(1) {
-		if( sig_quit == 1 ) {
+	while( 1 ) {
+		if( sig_quit ) {
+			sig_quit = 0;
 			process_worker_end( );
 		}
-		if( sig_perf == 1 ) {
-			process_perf_start( );
+		if( sig_perf ) {
 			sig_perf = 0;
+			performance_process_start( );
 		}
-		if( sig_perf_stop == 1 ) {
-			process_perf_stop( );
+		if( sig_perf_stop ) {
 			sig_perf_stop = 0;
+			performance_process_stop( );
 		}
 		timer_expire( &timer );
 		event_loop( timer );
@@ -86,41 +62,35 @@ static void process_worker_run( void )
 // process_spawn ------------------
 static pid_t process_spawn( process_t * pro )
 {
-	pid_t 		id;
+	pid_t id;
 
 	id = fork( );
 	if( id < 0 ) {
-		err_log( "%s --- fork error", __func__ );
+		err_log( "%s --- fork failed, [%d]", __func__, errno );
 		return ERROR;
 	} else if ( id > 0 ) {
-
 		// parent
 		pro->pid = id;
 	} else if ( id == 0 ) {
-
 		// child
 		process_id = pro->nid;
 		process_worker_run( );
 	}
 	return id;
 }
-// reap_child ----------------------
-static pid_t process_reap( void )
+// process_reap ----------------------
+static int32 process_reap( void )
 {
-	int32 live = 0;
+	status live = 0;
 	uint32 i;
-	pid_t pid;
 
 	for( i = 0; i < process_num; i ++ ) {
-		if( process_arr[i].pid == ERROR ) {
-			continue;
-		}
+
 		if( process_arr[i].exited ) {
 			if( !process_arr[i].exiting && !sig_quit ) {
-				pid = process_spawn( &process_arr[i] );
-				if( pid == ERROR ) {
-					err_log( "%s --- spawn errno [%d]", __func__, errno );
-					return ERROR;
+				if( ERROR == process_spawn( &process_arr[i] ) ) {
+					err_log( "%s --- process_spawn failed, [%d]", __func__, errno );
+					continue;
 				}
 				process_arr[i].exited = 0;
 				live = 1;
@@ -133,78 +103,72 @@ static pid_t process_reap( void )
 	}
 	return live;
 }
-// process_worker_run -------------------
-static status process_worker_start( void )
-{
-	uint32 i;
-
-	for( i = 0; i < process_num; i++ ) {
-		if( ERROR == process_spawn( &process_arr[i] ) ) {
-			err_log( "%s --- process spawn error", __func__ );
-			return ERROR;
-		}
-	}
-	return OK;
-}
 // process_master_run -------------------------
-status process_master_run( void )
+void process_master_run( void )
 {
+	uint32 i = 0;
 	int32 live = 1;
-	sigset_t    set;
+	sigset_t set;
 
     sigemptyset( &set );
     sigaddset( &set, SIGCHLD );
     sigaddset( &set, SIGINT );
 	sigaddset( &set, SIGUSR1 );
 	sigaddset( &set, SIGUSR2 );
-
     if( sigprocmask( SIG_BLOCK, &set, NULL ) == ERROR ) {
-		err_log( "%s --- sigs_suppend_init", __func__ );
-		return ERROR;
+		err_log( "%s --- sigs_suppend_init failed, [%d]", __func__, errno );
+		return;
     }
 	sigemptyset(&set);
 
-	process_worker_start( );
-	// master running wait signal
+	// fork child
+	for( i = 0; i < process_num; i++ ) {
+		if( ERROR == process_spawn( &process_arr[i] ) ) {
+			err_log( "%s --- process spawn failed, [%d]", __func__, errno );
+			return;
+		}
+	}
+	// goto loop wait signal
 	while( 1 ) {
 		sigsuspend( &set );
+		l_time_update( );
+		debug_log("%s --- master received signal [%d]", __func__, global_signal);
 
-		if( sig_reap == 1 ) {
+		if( sig_reap ) {
 			sig_reap = 0;
 			live = process_reap(  );
+			err_log("%s --- reap child", __func__ );
 		}
-		if( live == 0 && sig_quit == 1 ) {
+		if( !live && sig_quit ) {
 			break;
 		}
-		if( sig_quit == 1 ) {
+		if( sig_quit ) {
 			process_broadcast_child( SIGINT );
 			continue;
 		}
 	}
-	return OK;
 }
 // process_single_run ---------------
 void process_single_run( void )
 {
 	int32 timer;
-	sigset_t    set;
+	sigset_t set;
 
 	sigemptyset( &set );
 	sigprocmask( SIG_SETMASK, &set, NULL );
-
 	dynamic_module_init( );
-	while(1) {
-		if( sig_quit == 1 ) {
+	while( 1 ) {
+		if( sig_quit ) {
 			dynamic_module_end();
 			break;
 		}
-		if( sig_perf == 1 ) {
-			process_perf_start( );
+		if( sig_perf ) {
 			sig_perf = 0;
+			performance_process_start( );
 		}
-		if( sig_perf_stop == 1 ) {
-			process_perf_stop( );
+		if( sig_perf_stop ) {
 			sig_perf_stop = 0;
+			performance_process_stop( );
 		}
 		timer_expire( &timer );
 		event_loop( timer );
@@ -214,17 +178,12 @@ void process_single_run( void )
 status process_init( void )
 {
 	uint32 i;
-	uint32 process_number = 0;
 
-	process_number = conf.worker_process;
-	for( i = 0; i < process_number; i ++ ) {
+	memset( process_arr, 0, sizeof(process_arr) );
+	for( i = 0; i < conf.worker_process; i ++ ) {
 		process_arr[i].nid = i;
-		process_num ++;
-		if( process_num >= MAXPROCESS ) {
-			err_log( "%s --- process number too much", __func__ );
-			return ERROR;
-		}
 	}
+	process_num = conf.worker_process;
 	return OK;
 }
 // process_end -----------------------

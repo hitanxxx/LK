@@ -5,14 +5,14 @@ status heap_create( heap_t ** heap, uint32 size )
 {
 	heap_t * new;
 	
-	new = (heap_t*)malloc( sizeof(heap_t) );
+	new = (heap_t*)l_safe_malloc( sizeof(heap_t) );
 	if( !new ) {
 		return ERROR;
 	}
 	memset( new, 0, sizeof(heap_t));
 	new->array = NULL;
 	
-	new->array = (void*)malloc( sizeof(heap_node_t*)*(size+1) );
+	new->array = (void*)l_safe_malloc( sizeof(heap_node_t*)*(size+1) );
 	if( !new->array ) {
 		free( new ); 
 		return ERROR;

@@ -1,5 +1,9 @@
 #include "lk.h"
 
+static queue_t     usable;
+static queue_t     in_use;
+static tunnel_t *  pool;
+
 static char global_response[] = \
 "HTTP/1.1 200 Connection Established\r\n \
 Connection: keep-alive\r\n\r\n";
@@ -9,6 +13,9 @@ static status tunnel_local_process_request( event_t * ev );
 // tunnel_free -----------
 static status tunnel_free( tunnel_t * t )
 {
+	queue_remove( &t->queue );
+    queue_insert_tail( &usable, &t->queue );
+
 	t->upstream = NULL;
 	t->downstream = NULL;
 
@@ -25,24 +32,23 @@ static status tunnel_free( tunnel_t * t )
 	t->established.pos = t->established.last = t->established.start;
 	t->local_recv_chain.pos = t->local_recv_chain.last =
 		t->local_recv_chain.start;
-	free( t );
-	t = NULL;
 	return OK;
 }
 // tunnel_alloc -----------
 static status tunnel_alloc( tunnel_t ** tunnel )
 {
-	tunnel_t * new = NULL;
+	queue_t * q;
+    tunnel_t * new;
 
-	new = (tunnel_t *)malloc( sizeof(tunnel_t) );
-	if( !new ) {
-		err_log( "%s --- alloc new", __func__ );
-		return ERROR;
-	}
-	memset( new, 0, sizeof(tunnel_t) );
-	new->upstream = NULL;
-	new->downstream = NULL;
-	*tunnel = new;
+    if( queue_empty( &usable ) ) {
+        err_log("%s --- usable empty", __func__ );
+        return ERROR;
+    }
+    q = queue_head( &usable );
+    queue_remove( q );
+    queue_insert_tail( &in_use, q );
+    new = l_get_struct( q, tunnel_t, queue );
+    *tunnel = new;
 	return OK;
 }
 // tunnel_free_connection -------
@@ -92,7 +98,6 @@ static status tunnel_close_tunnel( tunnel_t * t )
 		net_transport_free( t->out );
 	}
 	tunnel_free( t );
-	t = NULL;
 	return OK;
 }
 // tunnel_over --------------
@@ -657,7 +662,7 @@ static status tunnel_remote_connect_test( connection_t * c )
 		err = errno;
 	}
 	if (err) {
-		err_log("%s --- connect test, [%s]", __func__, strerror(errno) );
+		err_log("%s --- remote connect test, [%d]", __func__, errno );
 		return ERROR;
 	}
 	return OK;
@@ -885,7 +890,13 @@ static status tunnel_local_process_request( event_t * ev )
 		return ERROR;
 	} else if ( rc == DONE ) {
 		timer_del( &downstream->read->timer );
-
+		// fix me 
+		if( l_find_str( t->request_head->host.data,
+			t->request_head->host.len,
+			"google", l_strlen("google") ) ) {
+			tunnel_over( t );
+			return OK;
+		}
 		if( t->request_head->method.len == l_strlen("CONNECT") ) {
 			if( strncmp( t->request_head->method.data, "CONNECT",
 			 l_strlen("CONNECT") ) == 0 ){
@@ -991,6 +1002,33 @@ static status tunnel_local_init( event_t * ev )
 	}
 	downstream->read->handler = tunnel_local_start;
 	return downstream->read->handler( downstream->read );
+}
+// tunnel_process_init ---------
+status tunnel_process_init( void )
+{
+	uint32 i;
+
+	queue_init( &usable );
+	queue_init( &in_use );
+	pool = ( tunnel_t * ) l_safe_malloc( sizeof(tunnel_t)*MAXCON );
+    if( !pool ) {
+        err_log("%s --- l_safe_malloc pool", __func__ );
+        return ERROR;
+    }
+    memset( pool, 0, sizeof(tunnel_t)*MAXCON );
+    for( i = 0; i < MAXCON; i ++ ) {
+        queue_insert_tail( &usable, &pool[i].queue );
+    }
+	return OK;
+}
+// tunnel_process_end ---------
+status tunnel_process_end( void )
+{
+	if( pool ) {
+        free( pool );
+    }
+    pool = NULL;
+	return OK;
 }
 // tunnel_init ---------
 status tunnel_init( void )

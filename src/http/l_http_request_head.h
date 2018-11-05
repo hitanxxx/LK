@@ -31,6 +31,7 @@ struct http_request_head_t {
 	request_handler 	handler;
 	uint32 				state;
 
+	char *				request_line_start;
 	char * 				request_line_end;
 	string_t			method;
 	string_t			schema;

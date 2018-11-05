@@ -28,6 +28,7 @@ status dynamic_module_init( void )
 	lktp_body_init();
 	serv_init();
 	webser_process_init();
+	tunnel_process_init();
 	perform_init();
 
 	return OK;
@@ -45,6 +46,7 @@ status dynamic_module_end( void )
 	lktp_body_end();
 	serv_end();
 	webser_process_end();
+	tunnel_process_end();
 	perform_end();
 	return OK;
 }
@@ -170,7 +172,7 @@ static status do_option(  )
 		return ERROR;
 	}
 	if( ERROR == kill( pid, SIGINT ) ) {
-		err_log( "kill signal to pidfile, [%s]", strerror(errno) );
+		err_log( "kill signal to pidfile, [%d]", errno );
 		return ERROR;
 	}
 	return OK;
@@ -228,7 +230,7 @@ int32 main( int argc, char * argv[] )
 		listen_stop( );
 		goto over;
 	}
-	if( process_num > 0 ) {
+	if( conf.worker_process ) {
 		process_master_run( );
 	} else {
 		process_single_run( );

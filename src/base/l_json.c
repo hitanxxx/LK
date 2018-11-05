@@ -756,9 +756,9 @@ status json_decode( json_t ** json, char * p, char * end )
 	json_content_t json_content;
 	json_t * new;
 
-	new = (json_t*)malloc( sizeof(json_t) );
+	new = (json_t*)l_safe_malloc( sizeof(json_t) );
 	if( !new ) {
-		err_log("%s --- malloc new", __func__ );
+		err_log("%s --- l_safe_malloc new", __func__ );
 		return ERROR;
 	}
 	memset( new, 0, sizeof(json_t) );
@@ -993,7 +993,7 @@ status json_create( json_t ** json )
 {
 	json_t * new = NULL;
 
-	new = (json_t*)malloc( sizeof(json_t) );
+	new = (json_t*)l_safe_malloc( sizeof(json_t) );
 	if( !new ) {
 		return ERROR;
 	}

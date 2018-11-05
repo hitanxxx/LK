@@ -1,7 +1,3 @@
-var arr_song_name 	= [];
-var arr_song_id 	= [];
-var arr_song_cover 	= [];
-
 var arr_length = 0;
 var arr_index = 0;
 
@@ -13,9 +9,10 @@ var audio = document.getElementById("audio");
 var music_src_prefix = 'http://music.163.com/song/media/outer/url?id=';
 var music_src_suffix = '.mp3';
 var timer;
+var arr_song_name 	= [];
+var arr_song_id 	= [];
+var arr_song_cover 	= [];
 
-// like 28177361
-// web  2137714071
 window.onload = function resource_init () {
 	var req = {};
 	req.ip = "music.163.com";
@@ -30,7 +27,7 @@ window.onload = function resource_init () {
 		task_start ( false );
 	})
 	.catch(function (error) {
-		alert("Get music infomation failed...");
+		alert("Get music list failed...");
 	});
 }
 function resource_cut( response ) {
@@ -79,9 +76,7 @@ audio.addEventListener( 'error', function () {
 	play2pause();
 	task_start(true);
 }, false );
-window.onbeforeunload = function(){
-
-}
+window.onbeforeunload = function(){ }
 function play2pause(){
 	document.getElementById("disk").className = "disk disk-rollstop";
 	document.getElementById("needle").className = "needle needle-pause";

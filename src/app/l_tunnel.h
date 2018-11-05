@@ -8,6 +8,7 @@
 #define		TUNNEL_SINGLE	0x0202
 
 typedef struct tunnel_t {
+	queue_t				queue;
 	connection_t * 		downstream;
 	connection_t * 		upstream;
 
@@ -26,6 +27,9 @@ typedef struct tunnel_t {
 
 	uint32		trans_body_done;
 } tunnel_t;
+
+status tunnel_process_end( void );
+status tunnel_process_init( void );
 
 status tunnel_init( void );
 status tunnel_end( void );

@@ -5,7 +5,7 @@ status mem_list_create( mem_list_t ** list, uint32 size )
 {
 	mem_list_t * new = NULL;
 
-	new = l_malloc( sizeof(mem_list_t) );
+	new = l_safe_malloc( sizeof(mem_list_t) );
 	if( !new ) {
 		return ERROR;
 	}
@@ -22,7 +22,7 @@ void * mem_list_push( mem_list_t * list )
 {
 	mem_list_part_t * new = NULL;
 
-	new = l_malloc( sizeof(mem_list_part_t) );
+	new = l_safe_malloc( sizeof(mem_list_part_t) );
 	if( !new ) {
 		return NULL;
 	}
@@ -30,7 +30,7 @@ void * mem_list_push( mem_list_t * list )
 	new->next = NULL;
 	new->data = NULL;
 
-	new->data = l_malloc( list->elem_size );
+	new->data = l_safe_malloc( list->elem_size );
 	if( !new->data ) {
 		free( new );
 		return NULL;

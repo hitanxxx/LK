@@ -345,9 +345,9 @@ status http_entitybody_init_module( void )
 
 	queue_init( &usable );
 	queue_init( &in_use );
-	pool = (http_entitybody_t*)malloc( sizeof(http_entitybody_t)*MAXCON );
+	pool = (http_entitybody_t*)l_safe_malloc( sizeof(http_entitybody_t)*MAXCON );
 	if( !pool ) {
-		err_log(  "%s --- malloc pool", __func__ );
+		err_log(  "%s --- l_safe_malloc pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(http_entitybody_t)*MAXCON );

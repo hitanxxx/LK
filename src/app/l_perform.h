@@ -38,7 +38,7 @@ struct perform_t {
 
 	http_response_head_t *		response_head;
 	http_entitybody_t *			response_body;
-	meta_t					send_chain;
+	meta_t						send_chain;
 
 	uint32					send_n;
 	uint32					recv_n;
@@ -51,8 +51,8 @@ status perform_init( void );
 status perform_end( void );
 
 status performance_process_running( void );
-status performance_process_start ( void * data );
-void performance_process_stop ( void * data );
+status performance_process_start ( void );
+status performance_process_stop ( void );
 
 status performance_count_output( json_t ** data );
 #endif

@@ -917,9 +917,9 @@ static status performance_setting_init( json_t * json )
 		pipeline->https = https;
 		pipeline->port = port;
 		pipeline->ip.len = ip.len;
-		pipeline->ip.data = (char*)malloc( pipeline->ip.len );
+		pipeline->ip.data = (char*)l_safe_malloc( pipeline->ip.len );
 		if( !pipeline->ip.data ) {
-			err_log("%s --- malloc ip data", __func__ );
+			err_log("%s --- l_safe_malloc ip data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->ip.data, ip.data, ip.len );
@@ -931,25 +931,25 @@ static status performance_setting_init( json_t * json )
 		pipeline->addr.sin_port = htons( pipeline->port );
 		// ---
 		pipeline->host.len = host.len;
-		pipeline->host.data = (char*)malloc( pipeline->host.len );
+		pipeline->host.data = (char*)l_safe_malloc( pipeline->host.len );
 		if( !pipeline->host.data ) {
-			err_log(  "%s --- malloc host data", __func__ );
+			err_log(  "%s --- l_safe_malloc host data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->host.data, host.data, host.len );
 		// ---
 		pipeline->method.len = method.len;
-		pipeline->method.data = (char*)malloc( pipeline->method.len );
+		pipeline->method.data = (char*)l_safe_malloc( pipeline->method.len );
 		if( !pipeline->method.data ) {
-			err_log(  "%s --- malloc method data", __func__ );
+			err_log(  "%s --- l_safe_malloc method data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->method.data, method.data, method.len );
 		// ---
 		pipeline->uri.len = uri.len;
-		pipeline->uri.data = (char*)malloc( pipeline->uri.len );
+		pipeline->uri.data = (char*)l_safe_malloc( pipeline->uri.len );
 		if( !pipeline->uri.data ) {
-			err_log(  "%s --- malloc uri data", __func__ );
+			err_log(  "%s --- l_safe_malloc uri data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->uri.data, uri.data, uri.len );
@@ -969,9 +969,9 @@ static status performance_setting_init( json_t * json )
 		pipeline->method.len, pipeline->method.data );
 		if ( OK == json_get_obj_str( t, "body", l_strlen("body"), &v ) ) {
 			pipeline->body.len = v->name.len;
-			pipeline->body.data = (char*)malloc( pipeline->body.len );
+			pipeline->body.data = (char*)l_safe_malloc( pipeline->body.len );
 			if( !pipeline->body.data ) {
-				err_log(  "%s --- malloc body data", __func__ );
+				err_log(  "%s --- l_safe_malloc body data", __func__ );
 				return ERROR;
 			}
 			memcpy( pipeline->body.data, v->name.data, v->name.len );
@@ -981,15 +981,20 @@ static status performance_setting_init( json_t * json )
 	}
 	return OK;
 }
+// performance_process_time_out ------------
+static void performance_process_time_out( void * data )
+{
+	l_unused( data );
+	performance_process_stop(  );
+}
 // performance_process_stop ----------------
-void performance_process_stop ( void * data )
+status performance_process_stop ( void )
 {
 	queue_t *q, *next;
 	perform_t * perform;
 
-	unused( data );
-	if( queue_empty( &in_use ) == 1 ) {
-		return;
+	if( queue_empty( &in_use ) ) {
+		return OK;
 	}
 	// clear perform running queue, stop all perform
 	q = queue_head( &in_use );
@@ -999,14 +1004,15 @@ void performance_process_stop ( void * data )
 		perf_over( perform, DONE );
 		q = next;
 	}
+	return OK;
 }
 // performance_process_running ----------
 status performance_process_running( void )
 {
 	return perf_settings.running_timer.f_timeset;
 }
-// performance_process_start ------------------
-status performance_process_start ( void * data )
+// performance_process_prepare ------------------
+static status performance_process_prepare ( void * data )
 {
 	json_t * json;
 	uint32 i, k;
@@ -1030,7 +1036,7 @@ status performance_process_start ( void * data )
 	}
 	// start
 	perf_settings.running_timer.data = NULL;
-	perf_settings.running_timer.handler = performance_process_stop;
+	perf_settings.running_timer.handler = performance_process_time_out;
 	timer_add( &perf_settings.running_timer, perf_settings.running_time_sec );
 	// start
 	for( i = 0; i < perf_settings.list_pipeline->elem_num; i ++ ) {
@@ -1044,6 +1050,26 @@ status performance_process_start ( void * data )
 	}
 	return OK;
 }
+// performance_process_start -------------
+status performance_process_start ( void )
+{
+	meta_t * t;
+	json_t * json;
+
+	if( OK != config_get( &t, L_PATH_PERFTEMP ) ) {
+		err_log( "%s --- get perf data", __func__ );
+		return ERROR;
+	}
+	if( OK != json_decode( &json, t->pos, t->last ) ) {
+		err_log( "%s --- json decode", __func__ );
+		meta_free( t );
+		return ERROR;
+	}
+	performance_process_prepare( (void*)json );
+	json_free( json );
+	meta_free( t );
+	return OK;
+}
 // perform_init -------------------------
 status perform_init( void )
 {
@@ -1051,7 +1077,7 @@ status perform_init( void )
 
 	queue_init( &usable );
 	queue_init( &in_use );
-	pool = ( perform_t *) malloc ( sizeof(perform_t) * MAXCON );
+	pool = ( perform_t *) l_safe_malloc ( sizeof(perform_t) * MAXCON );
 	if( !pool ) {
 		err_log(  "%s --- perform pool alloc", __func__ );
 		return ERROR;
