@@ -5,6 +5,22 @@ static queue_t 				usable;
 static perform_t*			pool = NULL;
 static perform_setting_t 	perf_settings;
 
+// share memory for perf module count data
+l_atomic_t	*	perform_success;
+l_atomic_t	*	perform_failed;
+l_atomic_t	*	perform_recvs;
+l_atomic_t	*	perform_sends;
+
+l_atomic_t	*	perform_200;
+l_atomic_t	*	perform_1xx;
+l_atomic_t	*	perform_2xx;
+l_atomic_t	*	perform_3xx;
+l_atomic_t	*	perform_4xx;
+l_atomic_t	*	perform_5xx;
+
+static uint32	shm_length = 0;
+static char * 	shm_ptr = NULL;
+
 static status performance_setting_end( void );
 static status perf_prepare( perform_t ** p );
 static status perf_go( perform_t * p );
@@ -17,7 +33,7 @@ static status perf_alloc( perform_t ** t )
 	queue_t * q;
 
 	if( 1 == queue_empty( &usable ) ) {
-		err_log(  "%s --- don't have perform", __func__ );
+		err_log(  "%s --- usable empty", __func__ );
 		return ERROR;
 	}
 
@@ -1070,8 +1086,8 @@ status performance_process_start ( void )
 	meta_free( t );
 	return OK;
 }
-// perform_init -------------------------
-status perform_init( void )
+// perform_process_init -------------------------
+status perform_process_init( void )
 {
 	int32 i;
 
@@ -1088,11 +1104,53 @@ status perform_init( void )
 	}
 	return OK;
 }
-// perform_end ---------------------------
-status perform_end( void )
+// perform_process_end ---------------------------
+status perform_process_end( void )
 {
 	if( pool ) {
 		free( pool );
 	}
+	return OK;
+}
+// perform_init ----------------
+status perform_init( void )
+{
+	if( !conf.perf_switch ) {
+		return OK;
+	}
+	shm_length += (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );
+	shm_ptr = (char*) mmap(NULL, shm_length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
+	if( shm_ptr == MAP_FAILED ) {
+		err_log("%s --- mmap shm failed, [%d]", __func__, errno );
+		return ERROR;
+	}
+	perform_success = (l_atomic_t*)( shm_ptr );
+	perform_failed = (l_atomic_t*)
+			( perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_recvs = (l_atomic_t*)
+			( perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_sends = (l_atomic_t*)
+			( perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_200 = (l_atomic_t*)
+			( perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_1xx = (l_atomic_t*)
+			( perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_2xx = (l_atomic_t*)
+			( perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_3xx = (l_atomic_t*)
+			( perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_4xx = (l_atomic_t*)
+			( perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perform_5xx = (l_atomic_t*)
+			( perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	return OK;
+}
+// perform_end --------------
+status perform_end( void )
+{
+	if( shm_ptr ) {
+		munmap((void *) shm_ptr, shm_length );
+	}
+	shm_ptr = NULL;
 	return OK;
 }

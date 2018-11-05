@@ -12,6 +12,7 @@ static module_init_pt static_modules[] = {
 	ssl_init,
 	tunnel_init,
 	webser_init,
+	perform_init,
 	NULL
 };
 
@@ -29,8 +30,7 @@ status dynamic_module_init( void )
 	serv_init();
 	webser_process_init();
 	tunnel_process_init();
-	perform_init();
-
+	perform_process_init();
 	return OK;
 }
 // dynamic_module_end ------------
@@ -47,7 +47,7 @@ status dynamic_module_end( void )
 	serv_end();
 	webser_process_end();
 	tunnel_process_end();
-	perform_end();
+	perform_process_end();
 	return OK;
 }
 // lk_daemon ---------------
@@ -148,6 +148,7 @@ static status module_init(  )
 static status modules_end(  )
 {
 	event_end();
+	perform_end();
 	// static module alloc nothing
 	return OK;
 }

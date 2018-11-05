@@ -10,21 +10,10 @@
 
 extern queue_t		queue_event;
 
-extern l_atomic_t	*	perform_success;
-extern l_atomic_t	*	perform_failed;
-extern l_atomic_t	*	perform_recvs;
-extern l_atomic_t	*	perform_sends;
-extern l_atomic_t	*	perform_200;
-extern l_atomic_t	*	perform_1xx;
-extern l_atomic_t	*	perform_2xx;
-extern l_atomic_t	*	perform_3xx;
-extern l_atomic_t	*	perform_4xx;
-extern l_atomic_t	*	perform_5xx;
-
 extern sem_t*		accept_mutex;
 extern pid_t		accept_mutex_user;
 
-// ---- 
+// ----
 typedef unsigned short  net_events;
 typedef struct event_t event_t;
 

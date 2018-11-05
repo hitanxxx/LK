@@ -6,25 +6,10 @@ queue_t				queue_event;
 static int32		event_fd = 0;
 static struct epoll_event * events = NULL;
 
-static char *		shm_ptr = NULL;
-static uint32		shm_length = 0;
 static uint32		accept_mutex_open = 0;
 static uint32		accept_event_open = 0;
 sem_t*				accept_mutex = NULL;
 pid_t				accept_mutex_user = 0;
-
-// share memory for perf module count data
-l_atomic_t	*	perform_success;
-l_atomic_t	*	perform_failed;
-l_atomic_t	*	perform_recvs;
-l_atomic_t	*	perform_sends;
-
-l_atomic_t	*	perform_200;
-l_atomic_t	*	perform_1xx;
-l_atomic_t	*	perform_2xx;
-l_atomic_t	*	perform_3xx;
-l_atomic_t	*	perform_4xx;
-l_atomic_t	*	perform_5xx;
 
 // event_connect ---------------
 status event_connect( event_t * event )
@@ -428,56 +413,26 @@ status event_process_end( void )
 // event_init -----------------
 status event_init( void )
 {
-	/*
-		init share memory for
-		1, accept mutex
-		2, lk-perf count data
-	*/
 	if( !conf.perf_switch && conf.accept_mutex &&
 		!conf.reuse_port && process_num > 1 ) {
-		shm_length += (uint32)sizeof(sem_t);
 		accept_mutex_open = 1;
-	}
-	shm_length += (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );
-	shm_ptr = (char*) mmap(NULL, shm_length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
-	if( shm_ptr == MAP_FAILED ) {
-		err_log("%s --- mmap shm failed, [%d]", __func__, errno );
-		return ERROR;
-	}
-	if( accept_mutex_open ) {
-		accept_mutex = (sem_t*)shm_ptr;
+		accept_mutex = (sem_t*) mmap(NULL, sizeof(sem_t), PROT_READ|PROT_WRITE,
+		MAP_ANON|MAP_SHARED, -1, 0);
+		if( accept_mutex == MAP_FAILED ) {
+			err_log("%s --- mmap shm failed, [%d]", __func__, errno );
+			return ERROR;
+		}
 		sem_init( accept_mutex, 1, 1 );
-		perform_success = (l_atomic_t*)( shm_ptr + sizeof(sem_t) );
-	} else {
-		perform_success = (l_atomic_t*)( shm_ptr );
 	}
-	perform_failed = (l_atomic_t*)
-			( perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_recvs = (l_atomic_t*)
-			( perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_sends = (l_atomic_t*)
-			( perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_200 = (l_atomic_t*)
-			( perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_1xx = (l_atomic_t*)
-			( perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_2xx = (l_atomic_t*)
-			( perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_3xx = (l_atomic_t*)
-			( perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_4xx = (l_atomic_t*)
-			( perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_5xx = (l_atomic_t*)
-			( perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
 	return OK;
 }
 // event_end -----------------
 status event_end( void )
 {
 	if( accept_mutex_open ) {
-		accept_mutex_open = 0;
 		sem_destroy( accept_mutex );
-		munmap((void *) shm_ptr, shm_length );
+		munmap((void *) accept_mutex, sizeof(sem_t) );
 	}
+	accept_mutex_open = 0;
 	return OK;
 }
