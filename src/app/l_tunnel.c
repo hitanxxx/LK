@@ -890,13 +890,6 @@ static status tunnel_local_process_request( event_t * ev )
 		return ERROR;
 	} else if ( rc == DONE ) {
 		timer_del( &downstream->read->timer );
-		// fix me 
-		if( l_find_str( t->request_head->host.data,
-			t->request_head->host.len,
-			"google", l_strlen("google") ) ) {
-			tunnel_over( t );
-			return OK;
-		}
 		if( t->request_head->method.len == l_strlen("CONNECT") ) {
 			if( strncmp( t->request_head->method.data, "CONNECT",
 			 l_strlen("CONNECT") ) == 0 ){
