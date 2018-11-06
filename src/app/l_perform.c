@@ -1031,6 +1031,7 @@ status performance_process_stop ( void )
 		perf_over( perform, DONE );
 		q = next;
 	}
+	timer_del( &perf_settings.running_timer );
 	return OK;
 }
 // performance_process_running ----------

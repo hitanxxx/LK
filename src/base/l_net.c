@@ -87,12 +87,14 @@ status net_free( connection_t * c )
 		c->fd = 0;
 	}
 	c->data = NULL;
-	c->meta->pos = c->meta->last = c->meta->start;
-	cl = c->meta->next;
-	while( cl ) {
-		n = cl->next;
-		meta_free( cl );
-		cl = n;
+	if( c->meta ) {
+		c->meta->pos = c->meta->last = c->meta->start;
+		cl = c->meta->next;
+		while( cl ) {
+			n = cl->next;
+			meta_free( cl );
+			cl = n;
+		}
 	}
 	memset( &c->addr, 0, sizeof(struct sockaddr_in) );
 	c->active_flag = 0;
