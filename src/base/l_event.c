@@ -144,7 +144,7 @@ status event_close( event_t * event, uint32 events )
 	int32	op;
 
 	c = event->data;
-	if( !event->f_active == 1 ) {
+	if( !event->f_active ) {
 		return OK;
 	}
 	if( events == EVENT_READ ) {
@@ -234,7 +234,7 @@ status event_loop( time_t time_out )
 		err_log( "%s --- epoll_wait return 0", __func__ );
 		return ERROR;
 	}
-	
+
 	for( i = 0; i < action_num; i ++ ) {
 		c = (connection_t*)events[i].data.ptr;
 		if( !c->active_flag ) {
