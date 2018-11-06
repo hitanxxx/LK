@@ -19,19 +19,22 @@ static status tunnel_free( tunnel_t * t )
 	t->upstream = NULL;
 	t->downstream = NULL;
 
-	t->request_head = NULL;
-	t->request_body = NULL;
-	t->response_head = NULL;
-	t->response_body = NULL;
+	t->https = 0;
+	t->http_response_version_n = 0;
+	t->established.pos = t->established.last = t->established.start;
+	t->established.next = NULL;
+	t->local_recv_chain.pos = t->local_recv_chain.last =
+		t->local_recv_chain.start;
+	t->local_recv_chain.next = NULL;
 
 	t->in = NULL;
 	t->out = NULL;
 
-	t->https = 0;
-	t->http_response_version_n = 0;
-	t->established.pos = t->established.last = t->established.start;
-	t->local_recv_chain.pos = t->local_recv_chain.last =
-		t->local_recv_chain.start;
+	t->request_head = NULL;
+	t->request_body = NULL;
+	t->response_head = NULL;
+	t->response_body = NULL;
+	t->trans_body_done = 0;
 	return OK;
 }
 // tunnel_alloc -----------
@@ -363,6 +366,7 @@ static status http_body_transport( tunnel_t * t, uint32 write )
 	downstream = t->downstream;
 	upstream = t->upstream;
 	while(1) {
+		err_log("%s --- send loop", __func__ );
 		if( write ) {
 			while(1) {
 				if( OK != http_body_transport_send_necessary( t ) ) {
@@ -404,8 +408,8 @@ static status http_body_transport( tunnel_t * t, uint32 write )
 			} else if ( rc == DONE ) {
 				t->trans_body_done = 1;
 			}
-			write = 1;
 		}
+		write = 1;
 	}
 	return OK;
 }

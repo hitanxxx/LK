@@ -15,7 +15,7 @@ typedef struct connection_t {
 	void*				data;
 	event_t *			read;
 	event_t *			write;
-	
+
 	struct sockaddr_in 	addr;
 	int32				f_active;
 	uint32				ssl_flag;
