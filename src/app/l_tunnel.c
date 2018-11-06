@@ -4,9 +4,8 @@ static queue_t     usable;
 static queue_t     in_use;
 static tunnel_t *  pool;
 
-static char global_response[] = \
-"HTTP/1.1 200 Connection Established\r\n \
-Connection: keep-alive\r\n\r\n";
+static char global_response[] = "HTTP/1.1 200 Connection Established\r\n"
+"Connection: keep-alive\r\n\r\n";
 
 static status tunnel_local_process_request( event_t * ev );
 
@@ -366,7 +365,6 @@ static status http_body_transport( tunnel_t * t, uint32 write )
 	downstream = t->downstream;
 	upstream = t->upstream;
 	while(1) {
-		err_log("%s --- send loop", __func__ );
 		if( write ) {
 			while(1) {
 				if( OK != http_body_transport_send_necessary( t ) ) {
@@ -923,8 +921,6 @@ static status tunnel_local_start ( event_t * ev )
 			tunnel_close_connection( downstream );
 			return ERROR;
 		}
-	} else {
-		downstream->meta->last = downstream->meta->pos= downstream->meta->start;
 	}
 	if( OK != tunnel_alloc( &t ) ) {
 		err_log( "%s --- tunnel alloc", __func__ );

@@ -677,8 +677,6 @@ static status webser_start_connection( event_t * ev )
 			webser_close_connection( c );
 			return ERROR;
 		}
-	} else {
-		c->meta->pos = c->meta->last = c->meta->start;
 	}
 	if( OK != webser_alloc( &new ) ) {
 		err_log( "%s --- webser_alloc", __func__ );

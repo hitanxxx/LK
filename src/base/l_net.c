@@ -6,52 +6,7 @@ static connection_t * pool = NULL;
 static event_t * read_pool = NULL;
 static event_t * write_pool = NULL;
 
-// net_alloc ----------------------------------------------------------------------------------------------------------------------------------
-status net_alloc( connection_t ** c )
-{
-	connection_t * new;
-	queue_t * q;
-
-	if( 1 == queue_empty( &usable ) ) {
-		err_log( "%s --- usbale empty", __func__ );
-		return ERROR;
-	}
-
-	q = queue_head( &usable );
-	queue_remove( q );
-	queue_insert_tail( &use, q );
-	new = l_get_struct( q, connection_t, queue );
-	*c = new;
-	return OK;
-}
-// net_free -----------------------------------------------------------------------------------------------------------------------------------
-status net_free( connection_t * c )
-{
-	queue_remove( &c->queue );
-	queue_insert_tail( &usable, &c->queue );
-
-	if( c->fd ) {
-		event_close( c->read, EVENT_READ );
-		event_close( c->write, EVENT_WRITE );
-		close( c->fd );
-		c->fd = 0;
-	}
-	c->data = NULL;
-
-	memset( &c->addr, 0, sizeof(struct sockaddr_in) );
-	c->read->handler = NULL;
-	c->write->handler = NULL;
-	timer_del( &c->read->timer );
-	timer_del( &c->write->timer );
-	c->read->f_active = 0;
-	c->write->f_active = 0;
-
-	c->f_active = 0;
-	c->ssl_flag = 0;
-	c->ssl = NULL;
-	return OK;
-}
-// net_non_blocking ---------------------------------------------------------------------------------------------------------------------
+// net_non_blocking ---------------
 status net_non_blocking( int fd )
 {
 	int32 nb;
@@ -62,7 +17,6 @@ status net_non_blocking( int fd )
 status net_fastopen( connection_t * c )
 {
 	int  tcp_fastopen = 1;
-
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_FASTOPEN,
 			(const void *) &tcp_fastopen, sizeof(tcp_fastopen)) ) {
 		err_log( "%s --- fastopen failed, [%d]", __func__, errno );
@@ -74,7 +28,6 @@ status net_fastopen( connection_t * c )
 status net_nodelay( connection_t * c )
 {
 	int  tcp_nodelay = 1;
-
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY,
 			(const void *) &tcp_nodelay, sizeof(tcp_nodelay)) ) {
 		err_log( "%s --- nodelay failed, [%d]", __func__, errno );
@@ -86,7 +39,6 @@ status net_nodelay( connection_t * c )
 status net_nopush( connection_t * c )
 {
     int  tcp_cork = 1;
-
 	if( ERROR == setsockopt(c->fd, IPPROTO_TCP, TCP_CORK,
 			(const void *) &tcp_cork, sizeof(tcp_cork)) ) {
 		err_log( "%s --- nopush failed, [%d]", __func__, errno );
@@ -120,21 +72,67 @@ struct addrinfo * net_get_addr( string_t * ip, string_t * port )
 	}
 	return res;
 }
-// net_init ----------------------------------------------------------------------------------------------------------------------------------
+// net_free ---------------
+status net_free( connection_t * c )
+{
+	meta_t * cl, *n;
+
+	queue_remove( &c->queue );
+	queue_insert_tail( &usable, &c->queue );
+
+	if( c->fd ) {
+		event_close( c->read, EVENT_READ );
+		event_close( c->write, EVENT_WRITE );
+		close( c->fd );
+		c->fd = 0;
+	}
+	c->data = NULL;
+	c->meta->pos = c->meta->last = c->meta->start;
+	cl = c->meta->next;
+	while( cl ) {
+		n = cl->next;
+		meta_free( cl );
+		cl = n;
+	}
+	memset( &c->addr, 0, sizeof(struct sockaddr_in) );
+	c->active_flag = 0;
+
+	c->ssl = NULL;
+	c->ssl_flag = 0;
+
+	timer_del( &c->read->timer );
+	c->read->handler = NULL;
+	c->read->f_active = 0;
+	timer_del( &c->write->timer );
+	c->write->handler = NULL;
+	c->write->f_active = 0;
+	return OK;
+}
+// net_alloc --------------
+status net_alloc( connection_t ** c )
+{
+	connection_t * new;
+	queue_t * q;
+
+	if( queue_empty( &usable ) ) {
+		err_log( "%s --- usbale empty", __func__ );
+		return ERROR;
+	}
+
+	q = queue_head( &usable );
+	queue_remove( q );
+	queue_insert_tail( &use, q );
+	new = l_get_struct( q, connection_t, queue );
+	*c = new;
+	return OK;
+}
+// net_init --------------
 status net_init( void )
 {
 	uint32 i;
 
 	queue_init( &usable );
 	queue_init( &use );
-
-	pool = ( connection_t *) l_safe_malloc ( sizeof(connection_t) * MAXCON );
-	if( !pool ) {
-		err_log( "%s --- l_safe_malloc pool", __func__ );
-		return ERROR;
-	}
-	memset( pool, 0, sizeof(connection_t) * MAXCON );
-
 	read_pool = (event_t*)l_safe_malloc( sizeof(event_t)* MAXCON );
 	if( !read_pool ) {
 		err_log( "%s --- l_safe_malloc read pool", __func__ );
@@ -149,17 +147,22 @@ status net_init( void )
 	}
 	memset( write_pool, 0, sizeof(event_t)*MAXCON );
 
+	pool = ( connection_t *) l_safe_malloc ( sizeof(connection_t) * MAXCON );
+	if( !pool ) {
+		err_log( "%s --- l_safe_malloc pool", __func__ );
+		return ERROR;
+	}
+	memset( pool, 0, sizeof(connection_t) * MAXCON );
 	for( i = 0; i < MAXCON; i ++ ) {
 		pool[i].read = &read_pool[i];
 		pool[i].write = &write_pool[i];
 		pool[i].read->data = (void*)&pool[i];
 		pool[i].write->data = (void*)&pool[i];
-
 		queue_insert_tail( &usable, &pool[i].queue );
 	}
 	return OK;
 }
-// net_end ------------------------------------------------------------------------------------------------------------------------------------
+// net_end ---------------
 status net_end( void )
 {
 	uint32 i;

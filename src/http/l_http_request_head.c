@@ -434,7 +434,7 @@ static status http_request_head_process_headers( http_request_head_t * request )
 			rc = http_request_head_recv( c, c->meta );
 			if( rc == AGAIN || rc == ERROR ) {
 				if( rc == ERROR ) {
-					err_log( "%s --- request read headers error", __func__ );
+					err_log( "%s --- read headers", __func__ );
 				}
 				return rc;
 			}
@@ -479,7 +479,7 @@ static status http_request_head_process_headers( http_request_head_t * request )
 			}
 			return DONE;
 		} else if( rc == ERROR ) {
-			err_log( "%s --- parse header line error", __func__ );
+			err_log( "%s --- parse header line", __func__ );
 			return ERROR;
 		}
 		if( c->meta->last == c->meta->end ) {
@@ -500,7 +500,7 @@ static status http_request_head_process_request_line( http_request_head_t * requ
 			rc = http_request_head_recv( c, c->meta );
 			if( rc == AGAIN || rc == ERROR ) {
 				if( rc == ERROR ) {
-					err_log( "%s --- request read header", __func__ );
+					err_log( "%s --- read header", __func__ );
 				}
 				return rc;
 			}
@@ -608,7 +608,7 @@ status http_request_head_init_module( void )
 	queue_init( &usable );
 	pool = (http_request_head_t*)l_safe_malloc( sizeof(http_request_head_t)*MAXCON );
 	if( !pool ) {
-		err_log("%s --- l_safe_malloc request pool", __func__ );
+		err_log("%s --- request pool", __func__ );
 		return ERROR;
 	}
 	memset( pool, 0, sizeof(http_request_head_t)*MAXCON );

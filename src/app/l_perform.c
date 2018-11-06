@@ -5,6 +5,7 @@ static queue_t 				usable;
 static perform_t*			pool = NULL;
 static perform_setting_t 	perf_settings;
 
+static l_atomic_t single_process_count_arr[PERFORM_MAX_PIPE] = {0};
 // share memory for perf module count data
 l_atomic_t	*	perform_success;
 l_atomic_t	*	perform_failed;
@@ -25,6 +26,7 @@ static status performance_setting_end( void );
 static status perf_prepare( perform_t ** p );
 static status perf_go( perform_t * p );
 static status perf_over( perform_t * p, status rc );
+static status performance_count_change( l_atomic_t * count, uint32 value );
 
 // perf_alloc ------------------------------------------
 static status perf_alloc( perform_t ** t )
@@ -56,6 +58,7 @@ static status perf_free( perform_t * p )
 	p->response_head = NULL;
 	p->response_body = NULL;
 	p->send_chain.pos = p->send_chain.last = p->send_chain.start;
+	p->send_chain.next = NULL;
 
 	p->send_n  = 0;
 	p->recv_n = 0;
@@ -168,19 +171,19 @@ static status perf_over( perform_t * p, status rc )
 		// if we got a complate response, but it's not 200 response status.
 		// we still think that it's success
 		debug_log(  "%s --- perform over, OK", __func__ );
-		__sync_fetch_and_add( &perform_success[p->pipeline_index], 1 );
+		performance_count_change( &perform_success[p->pipeline_index], 1 );
 		if( RES_CODE(p) == 200 ) {
-			__sync_fetch_and_add( &perform_200[p->pipeline_index], 1 );
+			performance_count_change( &perform_200[p->pipeline_index], 1 );
 		} else if ( 100 <= RES_CODE(p) && RES_CODE(p) < 200 ) {
-			__sync_fetch_and_add( &perform_1xx[p->pipeline_index], 1 );
+			performance_count_change( &perform_1xx[p->pipeline_index], 1 );
 		} else if ( 200 <  RES_CODE(p) && RES_CODE(p) < 300 ) {
-			__sync_fetch_and_add( &perform_2xx[p->pipeline_index], 1 );
+			performance_count_change( &perform_2xx[p->pipeline_index], 1 );
 		} else if ( 300 <= RES_CODE(p) && RES_CODE(p) < 400 ) {
-			__sync_fetch_and_add( &perform_3xx[p->pipeline_index], 1 );
+			performance_count_change( &perform_3xx[p->pipeline_index], 1 );
 		} else if ( 400 <= RES_CODE(p) && RES_CODE(p) < 500 ) {
-			__sync_fetch_and_add( &perform_4xx[p->pipeline_index], 1 );
+			performance_count_change( &perform_4xx[p->pipeline_index], 1 );
 		} else if ( 500 <= RES_CODE(p) && RES_CODE(p) < 600 ) {
-			__sync_fetch_and_add( &perform_5xx[p->pipeline_index], 1 );
+			performance_count_change( &perform_5xx[p->pipeline_index], 1 );
 		}
 		// if keep alive on, don't free the connection, set a keepalive timer
 		if( p->response_head->keepalive && perf_settings.keepalive ) {
@@ -202,7 +205,7 @@ static status perf_over( perform_t * p, status rc )
 		return perf_go( p );
 	} else if ( rc == ERROR ) {
 		// got a error, change flag, continue
-		__sync_fetch_and_add( &perform_failed[p->pipeline_index], 1 );
+		performance_count_change( &perform_failed[p->pipeline_index], 1 );
 		perf_close_connection( c );
 		perf_close_perform( p );
 
@@ -230,19 +233,16 @@ static status perf_recv_body( event_t * ev )
 		return ERROR;
 	} else if ( rc == DONE ) {
 		timer_del( &c->read->timer );
-
-		if( p->response_body->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			__sync_fetch_and_add( &perform_recvs[p->pipeline_index],
-			p->response_body->content_length );
-		} else if( p->response_body->body_type == HTTP_ENTITYBODY_CHUNK ) {
-			__sync_fetch_and_add( &perform_recvs[p->pipeline_index],
-			p->response_body->chunk_all_length );
-		}
-
 		debug_log(  "%s --- success", __func__ );
+		if( p->response_body->body_type == HTTP_ENTITYBODY_CONTENT ) {
+			performance_count_change( &perform_recvs[p->pipeline_index],
+			 	p->response_body->content_length );
+		} else if( p->response_body->body_type == HTTP_ENTITYBODY_CHUNK ) {
+			performance_count_change( &perform_recvs[p->pipeline_index],
+			 	p->response_body->chunk_all_length );
+		}
 		return perf_over( p, OK );
 	}
-	debug_log("%s --- recv body again", __func__ );
 	c->read->timer.data = (void*)p;
 	c->read->timer.handler = perf_time_out;
 	timer_add( &c->read->timer, PERFORM_TIME_OUT );
@@ -265,13 +265,10 @@ static status perf_recv_header ( event_t * ev )
 	} else if( rc == DONE ) {
 		timer_del( &c->read->timer );
 		debug_log(  "%s --- success", __func__ );
-		__sync_fetch_and_add( &perform_recvs[p->pipeline_index],
-			meta_len( p->response_head->head.pos, p->response_head->head.last ) );
+		performance_count_change( &perform_recvs[p->pipeline_index],
+		 	meta_len( p->response_head->head.pos, p->response_head->head.last) );
 
-		debug_log("%s --- head [%.*s]", __func__,
-	 	meta_len( p->response_head->head.pos, p->response_head->head.last ),
-	 	p->response_head->head.pos );
-		// no body, goto perf again
+		// have't any response body
 		if(	p->response_head->body_type == HTTP_ENTITYBODY_NULL ) {
 			return perf_over( p, OK );
 		}
@@ -308,9 +305,8 @@ static status perf_send( event_t * ev )
 		return ERROR;
 	} else if ( rc == DONE ) {
 		timer_del( &c->write->timer );
-		__sync_fetch_and_add( &perform_sends[p->pipeline_index],
-			 p->send_n );
 		debug_log(  "%s --- success", __func__ );
+		performance_count_change( &perform_sends[p->pipeline_index], p->send_n );
 
 		if( OK != http_response_head_create( c, &p->response_head ) ) {
 			err_log(  "%s --- http_response_head_create", __func__ );
@@ -318,14 +314,14 @@ static status perf_send( event_t * ev )
 			return ERROR;
 		}
 		event_opt( c->read, EVENT_READ );
-		event_close( c->write, EVENT_WRITE );
-		c->write->handler = NULL;
 		c->read->handler = perf_recv_header;
+		c->write->handler = NULL;
 
-		c->read->timer.data = (void*)p;
-		c->read->timer.handler = perf_time_out;
-		timer_add( &c->read->timer, PERFORM_TIME_OUT );
-		return AGAIN;
+		return c->read->handler( c->read );
+		// c->read->timer.data = (void*)p;
+		// c->read->timer.handler = perf_time_out;
+		// timer_add( &c->read->timer, PERFORM_TIME_OUT );
+		// return AGAIN;
 	}
 	c->write->timer.data = (void*)p;
 	c->write->timer.handler = perf_time_out;
@@ -458,7 +454,7 @@ static status perf_send_prepare( event_t * ev )
 
 	if( !p->pipeline->request_meta ) {
 		if( OK != perf_send_prepare_request( p->pipeline ) ) {
-			err_log(  "%s --- make request", __func__ );
+			err_log(  "%s --- create pipeline request data", __func__ );
 			perf_over( p, ERROR );
 			return ERROR;
 		}
@@ -467,9 +463,6 @@ static status perf_send_prepare( event_t * ev )
 	p->send_chain.pos = p->pipeline->request_meta->pos;
 	p->send_chain.last = p->pipeline->request_meta->last;
 	p->send_n = meta_len( p->send_chain.pos, p->send_chain.last );
-	debug_log("%s --- meta [%.*s]", __func__,
- 	meta_len( p->send_chain.pos, p->send_chain.last ),
- 	p->send_chain.pos );
 
 	c->write->handler = perf_send;
 	return c->write->handler( c->write );
@@ -520,7 +513,6 @@ static status perf_connect_check ( event_t * ev )
 
 	c = ev->data;
 	p = c->data;
-
 	if( c->write->timer.f_timeset ) {
 		if( OK != perf_connect_test( c ) ) {
 			err_log(  "%s --- connect test", __func__ );
@@ -531,7 +523,6 @@ static status perf_connect_check ( event_t * ev )
 	}
 	debug_log(  "%s --- connect success", __func__ );
 
-	debug_log("%s --- https flag [%d]", __func__, p->pipeline->https );
 	if( p->pipeline->https ) {
 		c->ssl_flag = 1;
 		if( OK != ssl_create_connection( c, L_SSL_CLIENT ) ) {
@@ -597,7 +588,7 @@ static status perf_prepare( perform_t ** p )
 	connection_t * c;
 
 	if( OK != perf_alloc( &new ) ) {
-		err_log(  "%s --- alloc perf obj", __func__ );
+		err_log(  "%s --- alloc perf object", __func__ );
 		return ERROR;
 	}
 	if( OK != net_alloc( &c ) ) {
@@ -610,13 +601,12 @@ static status perf_prepare( perform_t ** p )
 	c->send_chain = send_chains;
 	c->recv_chain = NULL;
 	if( !c->meta ) {
+		// peer response head length limit value 4096
 		if( OK != meta_alloc( &c->meta, 4096 ) ) {
 			err_log( "%s --- c meta alloc", __func__ );
 			perf_close_perform( new );
 			return ERROR;
 		}
-	} else {
-		c->meta->pos = c->meta->last = c->meta->start;
 	}
 	new->c = c;
 	c->data = (void*)new;
@@ -624,6 +614,27 @@ static status perf_prepare( perform_t ** p )
 	c->read->handler = NULL;
 	c->write->handler = perf_connect;
 	*p = new;
+	return OK;
+}
+// performance_count_change --------------
+static status performance_count_change( l_atomic_t * count, uint32 value )
+{
+	/*
+		count always increment, clean count if value is 0
+	*/
+	if( value == 0 ) {
+		if( conf.worker_process <= 1 ) {
+			*count = 0;
+		} else {
+			__sync_fetch_and_and( count, 0 );
+		}
+	} else {
+		if( conf.worker_process <= 1 ) {
+			*count += value;
+		} else {
+			__sync_fetch_and_add( count, value );
+		}
+	}
 	return OK;
 }
 // performance_count_output --------------
@@ -791,17 +802,17 @@ static status performance_count_init( void )
 	uint32 i;
 	// clear share memory count data
 	for( i = 0; i < PERFORM_MAX_PIPE; i ++ ) {
-		__sync_fetch_and_and( &perform_success[i], 0 );
-		__sync_fetch_and_and( &perform_failed[i], 0 );
-		__sync_fetch_and_and( &perform_sends[i], 0 );
-		__sync_fetch_and_and( &perform_recvs[i], 0 );
+		performance_count_change( &perform_success[i], 0 );
+		performance_count_change( &perform_failed[i], 0 );
+		performance_count_change( &perform_sends[i], 0 );
+		performance_count_change( &perform_recvs[i], 0 );
 
-		__sync_fetch_and_and( &perform_200[i], 0 );
-		__sync_fetch_and_and( &perform_1xx[i], 0 );
-		__sync_fetch_and_and( &perform_2xx[i], 0 );
-		__sync_fetch_and_and( &perform_3xx[i], 0 );
-		__sync_fetch_and_and( &perform_4xx[i], 0 );
-		__sync_fetch_and_and( &perform_5xx[i], 0 );
+		performance_count_change( &perform_200[i], 0 );
+		performance_count_change( &perform_1xx[i], 0 );
+		performance_count_change( &perform_2xx[i], 0 );
+		performance_count_change( &perform_3xx[i], 0 );
+		performance_count_change( &perform_4xx[i], 0 );
+		performance_count_change( &perform_5xx[i], 0 );
 	}
 	performance_setting_end( );
 	return OK;
@@ -1054,7 +1065,9 @@ static status performance_process_prepare ( void * data )
 	perf_settings.running_timer.data = NULL;
 	perf_settings.running_timer.handler = performance_process_time_out;
 	timer_add( &perf_settings.running_timer, perf_settings.running_time_sec );
-	// start
+	/*
+		each pipeline have concurrent num instance
+	*/
 	for( i = 0; i < perf_settings.list_pipeline->elem_num; i ++ ) {
 		for( k = 0; k < perf_settings.concurrent; k ++ ) {
 			perf_prepare( &p );
@@ -1116,6 +1129,19 @@ status perform_process_end( void )
 status perform_init( void )
 {
 	if( !conf.perf_switch ) {
+		return OK;
+	}
+	if( conf.worker_process <= 1 ) {
+		perform_success = &single_process_count_arr[0];
+		perform_failed = &single_process_count_arr[1];
+		perform_sends = &single_process_count_arr[2];
+		perform_recvs = &single_process_count_arr[3];
+		perform_200 = &single_process_count_arr[4];
+		perform_1xx = &single_process_count_arr[5];
+		perform_2xx = &single_process_count_arr[6];
+		perform_3xx = &single_process_count_arr[7];
+		perform_4xx = &single_process_count_arr[8];
+		perform_5xx = &single_process_count_arr[9];
 		return OK;
 	}
 	shm_length += (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );

@@ -9,7 +9,6 @@
 #define EVENT_RW			 EVENT_READ|EVENT_WRITE
 
 extern queue_t		queue_event;
-
 extern sem_t*		accept_mutex;
 extern pid_t		accept_mutex_user;
 

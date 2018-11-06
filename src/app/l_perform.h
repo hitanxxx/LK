@@ -6,6 +6,14 @@
 #define 		PERFORM_KEEP_ALIVE_TIME_OUT			PERFORM_TIME_OUT
 #define 		RES_CODE(p) ( p->response_head->http_status_code )
 
+typedef struct perform_setting_t {
+	uint32 			concurrent;
+	uint32 			keepalive;
+	uint32			running_time_sec;
+	timer_msg_t		running_timer;
+	mem_list_t *	list_pipeline;
+} perform_setting_t;
+
 typedef struct perform_pipeline_t {
 	struct sockaddr_in 	addr;
 	meta_t*		request_meta;
@@ -20,19 +28,11 @@ typedef struct perform_pipeline_t {
 	string_t	body;
 } perform_pipeline_t;
 
-typedef struct perform_setting_t {
-	uint32 			concurrent;
-	uint32 			keepalive;
-	uint32			running_time_sec;
-	timer_msg_t		running_timer;
-	mem_list_t *	list_pipeline;
-} perform_setting_t;
-
-// perform
 typedef struct perform_t perform_t;
 typedef status (*perform_handler)( perform_t * );
 struct perform_t {
 	queue_t					queue;
+	// peer connection
 	connection_t* 			c;
 	perform_handler 		handler;
 

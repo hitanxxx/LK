@@ -14,25 +14,24 @@ pid_t				accept_mutex_user = 0;
 // event_connect ---------------
 status event_connect( event_t * event )
 {
-	int32 fd, rc;
-	int  reuse_addr = 1;
+	int32 fd;
+	status rc;
 	connection_t * c;
+	int	reuse_addr = 1;
 
-	c = (connection_t*)event->data;
-
+	c = event->data;
 	fd = socket(AF_INET, SOCK_STREAM, 0 );
-	if( fd < 0 ) {
-		err_log( "%s --- socket", __func__ );
+	if( ERROR == fd ) {
+		err_log( "%s --- socket failed, [%d]", __func__, errno );
 		return ERROR;
 	}
-	net_non_blocking( fd );
-
-	if ( ERROR == setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &reuse_addr, sizeof(int)) ) {
-		err_log( "%s --- setsockopt SO_REUSEADDR", __func__ );
+	if( ERROR == setsockopt( fd, SOL_SOCKET, SO_REUSEADDR,
+			(const void *) &reuse_addr, sizeof(int)) ) {
+		err_log( "%s --- so_reuseaddr failed, [%d]", __func__, errno );
 		close( fd );
 		return ERROR;
 	}
-
+	net_non_blocking( fd );
 	rc = connect( fd, (struct sockaddr*)&c->addr, sizeof(struct sockaddr_in) );
 	if( rc == ERROR ) {
 		if( errno != EINPROGRESS ) {
@@ -40,33 +39,31 @@ status event_connect( event_t * event )
 			close(fd);
 			return ERROR;
 		}
+		rc = AGAIN;
 	}
 	c->fd = fd;
-	return OK;
+	return rc;
 }
 // event_accept ----------------
 status event_accept( event_t * event )
 {
 	connection_t * c, *listen_c;
 	struct sockaddr_in client_addr;
-	socklen_t len;
+	socklen_t len = sizeof( struct sockaddr_in );
 	int32 fd;
 	listen_t * ls;
 
 	listen_c = event->data;
 	ls = listen_c->data;
-
 	while( 1 ) {
-		len = sizeof( struct sockaddr_in );
-		memset(&client_addr, 0, sizeof(struct sockaddr_in));
+		memset( &client_addr, 0, len );
 		fd = accept( listen_c->fd, (struct sockaddr *)&client_addr, &len );
 		if( ERROR == fd ) {
-			if( errno == ECONNABORTED ) {
-				continue;
-			}
-			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
+			if( errno == EWOULDBLOCK || errno == EAGAIN ) {
 				return AGAIN;
 			}
+			err_log("%s --- accept failed, [%d]", __func__, errno );
+			return ERROR;
 		}
 		if( ERROR == net_alloc( &c ) ) {
 			err_log( "%s --- net_alloc", __func__ );
@@ -74,7 +71,7 @@ status event_accept( event_t * event )
 			return ERROR;
 		}
 		c->fd = fd;
-		memcpy( &c->addr, &client_addr, sizeof(struct sockaddr_in) );
+		memcpy( &c->addr, &client_addr, len );
 		net_non_blocking(c->fd);
 
 		c->recv = recvs;
@@ -82,11 +79,9 @@ status event_accept( event_t * event )
 		c->recv_chain = NULL;
 		c->send_chain = send_chains;
 
-		if( ls->type == HTTPS ){
-			c->ssl_flag = 1;
-		}
-		c->read->handler = ls->handler;
+		c->ssl_flag = (ls->type == HTTPS) ? 1 : 0;
 
+		c->read->handler = ls->handler;
 		event_opt( c->read, EVENT_READ );
 		if( accept_mutex_open ) {
 			queue_insert( &queue_event, &c->read->queue );
@@ -97,105 +92,84 @@ status event_accept( event_t * event )
 	return OK;
 }
 // event_opt ----------------
-status event_opt( event_t * event, net_events flag )
+status event_opt( event_t * event, net_events events )
 {
-	event_t * e;
+	event_t * pre_event;
+	net_events pre;
 	struct epoll_event ev;
 	int32 op;
 	connection_t * c;
-	net_events events, prev;
 
+	/*
+		read event only read.
+		write event only write
+	*/
 	c = event->data;
-	events = flag;
-
-	if( event->f_active == 1 ) {
+	if( event->f_active == 1) {
 		return OK;
 	}
-
-	if( flag == EVENT_WRITE ) {
-		e = c->read;
-		prev = EPOLLIN; //|EPOLLRDHUP;
-	} else if ( flag == EVENT_READ ) {
-		e = c->write;
-		prev = EPOLLOUT;
+	if( events == EVENT_READ ) {
+		pre_event = c->write;
+		pre = EVENT_WRITE;
+	} else if ( events == EVENT_WRITE ) {
+		pre_event = c->read;
+		pre = EVENT_READ;
 	} else {
-		err_log( "%s --- not support flag", __func__ );
+		err_log("%s --- unknown opt, [%d]", __func__, events );
 		return ERROR;
 	}
-
-	if( e->f_active ) {
+	if( pre_event->f_active == 1 ) {
 		op = EPOLL_CTL_MOD;
-		events |= prev;
+		events |= pre;
 	} else {
 		op = EPOLL_CTL_ADD;
 	}
-
 	ev.data.ptr = (void*)c;
 	ev.events =  EPOLLET | events;
-
 	if( OK != epoll_ctl( event_fd, op, c->fd, &ev ) ) {
-		err_log( "%s --- EPOLL_CTL_MOD [%d] EPOLL_CTL_ADD [%d]", __func__, EPOLL_CTL_MOD, EPOLL_CTL_DEL );
-		err_log( "%s --- epoll ctl [%d] failed, errno [%d]", __func__, op, errno );
+		err_log("%s --- epoll_ctl failed, [%d]", __func__ );
 		return ERROR;
 	}
 	event->f_active = 1;
-	c->f_active = 1;
-
+	c->active_flag = 1;
 	return OK;
 }
 // event_close ----------
-status event_close( event_t * event, uint32 flag )
+status event_close( event_t * event, uint32 events )
 {
 	struct epoll_event ev;
 	connection_t * c;
-	net_events prev_want;
-	event_t *e, *prev;
-	uint32	need_active;
+	net_events pre;
+	event_t * pre_event;
+	int32	op;
 
 	c = event->data;
-
-	if( flag == EVENT_READ ) {
-		e = c->read;
-		prev = c->write;
-		prev_want = EPOLLOUT;
-	} else if( flag == EVENT_WRITE ) {
-		e = c->write;
-		prev = c->read;
-		prev_want = EPOLLIN;
-	} else {
-		debug_log( "%s --- not support flag", __func__ );
-		return ERROR;
-	}
-
-	// if ev dont need to del
-	if( !e->f_active ) {
+	if( !event->f_active == 1 ) {
 		return OK;
 	}
-	// if need del, get reverse
-	if( prev->f_active ) {
-		need_active = 1;
-	}
-	// del all
-	ev.data.ptr = (void*)c;
-	ev.events = EPOLLET | EPOLLIN | EPOLLOUT;
-
-	if( OK != epoll_ctl( event_fd, EPOLL_CTL_DEL, c->fd, &ev ) ) {
-		err_log( "%s --- epoll del failed, errno [%d]", __func__, errno );
+	if( events == EVENT_READ ) {
+		pre_event = c->write;
+		pre = EPOLLOUT;
+	} else if( events == EVENT_WRITE ) {
+		pre_event = c->read;
+		pre = EPOLLIN;
+	} else {
+		debug_log( "%s --- unknown opt, [%d]", __func__, events );
 		return ERROR;
 	}
-	c->read->f_active = 0;
-	c->write->f_active = 0;
-	// add prev
-	if( need_active ) {
-		ev.data.ptr = (void*)c;
-		ev.events =  EPOLLET | prev_want;
-
-		if( OK != epoll_ctl( event_fd, EPOLL_CTL_ADD, c->fd, &ev ) ) {
-			err_log( "%s --- epoll del failed, errno [%d]", __func__, errno );
-			return ERROR;
-		}
-		prev->f_active = 1;
+	if( pre_event->f_active == 1 ) {
+		op = EPOLL_CTL_MOD;
+		events = pre | EPOLLET;
+	} else {
+		op = EPOLL_CTL_DEL;
 	}
+	ev.data.ptr = (void*)c;
+	ev.events = events;
+	if( OK != epoll_ctl( event_fd, op, c->fd, &ev ) ) {
+		err_log( "%s --- epoll_ctl failed, [%d]", __func__, errno );
+		return ERROR;
+	}
+	c->write->f_active = 0;
 	return OK;
 }
 // event_accept_event_opt ------------------
@@ -260,10 +234,10 @@ status event_loop( time_t time_out )
 		err_log( "%s --- epoll_wait return 0", __func__ );
 		return ERROR;
 	}
-
+	
 	for( i = 0; i < action_num; i ++ ) {
 		c = (connection_t*)events[i].data.ptr;
-		if( !c->f_active ) {
+		if( !c->active_flag ) {
 			continue;
 		}
 		ev = events[i].events;
@@ -335,21 +309,20 @@ status event_process_init( void )
 
 	queue_init( &queue_accept );
 	queue_init( &queue_event );
-	events = (struct epoll_event*)l_safe_malloc( sizeof(struct epoll_event) * MAXEVENTS );
+	events = (struct epoll_event*)
+		l_safe_malloc( sizeof(struct epoll_event)*MAXEVENTS );
 	if( !events ) {
 		err_log( "%s --- l_safe_malloc events", __func__ );
 		return ERROR;
 	}
 	event_fd = epoll_create1(0);
 	if( event_fd == ERROR ) {
-		err_log( "%s --- cpoll create", __func__ );
+		err_log( "%s --- epoll create1", __func__ );
 		return ERROR;
 	}
 
 	if( conf.perf_switch ) {
-		if( process_id != process_num - 1 && process_id != 0xffff ) {
-			// goto return
-		} else {
+		if( process_id == 0xffff || ( process_id == process_num - 1 ) ) {
 			for( i = 0; i < listens->elem_num; i ++ ) {
 				listen_head = mem_list_get( listens, i+1 );
 				if( OK != net_alloc( &c ) ) {

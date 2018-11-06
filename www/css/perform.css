@@ -192,7 +192,7 @@ table th:first-child {
 	font-size:13px;
 	width:100%;
 	bottom:0px;
-
+    color: #272727;
 }
 .footer a:link {
 	text-decoration:none;
