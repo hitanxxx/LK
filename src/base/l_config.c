@@ -15,8 +15,8 @@ status config_get ( meta_t ** meta, char * path )
 		return ERROR;
 	}
 	length = (uint32)stconf.st_size;
-	if( length > 4096 ) {
-		err_log( "%s --- config.json should't be so big( <= 4096 byte )" );
+	if( length > CONF_SETTING_LENGTH ) {
+		err_log( "%s --- config.json > CONF_SETTING_LENGTH" );
 		return ERROR;
 	}
 	if( OK != meta_alloc( &new, length ) ) {

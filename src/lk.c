@@ -13,6 +13,8 @@ static module_init_pt static_modules[] = {
 	tunnel_init,
 	webser_init,
 	perform_init,
+	serv_init,
+	webapi_init,
 	NULL
 };
 
@@ -27,7 +29,6 @@ status dynamic_module_init( void )
 	http_entitybody_init_module();
 	lktp_head_init();
 	lktp_body_init();
-	serv_init();
 	webser_process_init();
 	tunnel_process_init();
 	perform_process_init();
@@ -44,7 +45,6 @@ status dynamic_module_end( void )
 	http_entitybody_end_module();
 	lktp_head_end();
 	lktp_body_end();
-	serv_end();
 	webser_process_end();
 	tunnel_process_end();
 	perform_process_end();
@@ -147,6 +147,7 @@ static status module_init(  )
 // modules_end ----------------
 static status modules_end(  )
 {
+	serv_end();
 	event_end();
 	perform_end();
 	// static module alloc nothing

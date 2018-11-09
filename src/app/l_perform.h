@@ -4,6 +4,7 @@
 #define 		PERFORM_MAX_PIPE					10
 #define 		PERFORM_TIME_OUT					3
 #define 		PERFORM_KEEP_ALIVE_TIME_OUT			PERFORM_TIME_OUT
+#define 		PERFORM_SETTING_LENGTH				32768
 #define 		RES_CODE(p) ( p->response_head->http_status_code )
 
 typedef struct perform_setting_t {

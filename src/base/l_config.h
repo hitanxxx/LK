@@ -1,6 +1,8 @@
 #ifndef _L_CONFIG_H_INCLUDED_
 #define _L_CONFIG_H_INCLUDED_
 
+#define 		CONF_SETTING_LENGTH				32768
+
 typedef struct config_t
 {
 	meta_t* 	meta;

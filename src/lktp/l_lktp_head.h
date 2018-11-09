@@ -2,7 +2,8 @@
 #define _L_LKTP_HEAD_H_INCLUDED_
 
 /*
-    lk transfer poroctol message format
+    a very simple transfer poroctol's message format
+    version:v0.1
 
     number   string   number    ~
     version | api | bodylength | bodyraw

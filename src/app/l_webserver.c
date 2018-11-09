@@ -573,12 +573,7 @@ static status webser_process_api( event_t * ev )
 
 	c = ev->data;
 	webser = c->data;
-
-	rc = webser->api_handler( (void*)webser );
-	if( rc == ERROR ) {
-		err_log( "%s --- api handler error", __func__ );
-	}
-	return rc;
+	return webser->api_handler( (void*)webser );
 }
 // webser_process_request_body ----------
 static status webser_process_request_body( event_t * ev )

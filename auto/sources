@@ -7,6 +7,7 @@ src/util \
 src/http \
 src/lktp \
 src/app \
+src/apis \
 "
 
 DEPS="src/lk_global.h \
@@ -27,16 +28,17 @@ src/base/l_json.h \
 src/base/l_timer.h \
 src/base/l_ssl.h \
 src/base/l_send.h \
+src/base/l_serv.h \
 src/http/l_upstream.h \
 src/http/l_http_entitybody.h \
 src/http/l_http_response_head.h \
 src/http/l_http_request_head.h \
 src/lktp/l_lktp_head.h \
 src/lktp/l_lktp_body.h \
-src/app/l_serv.h \
 src/app/l_perform.h \
 src/app/l_tunnel.h \
 src/app/l_webserver.h \
+src/apis/l_webapi.h \
 src/util/l_list.h \
 src/util/l_queue.h \
 src/util/l_bst.h \
@@ -64,16 +66,17 @@ src/base/l_signal.c \
 src/base/l_json.c \
 src/base/l_ssl.c \
 src/base/l_send.c \
+src/base/l_serv.c \
 src/http/l_upstream.c \
 src/http/l_http_entitybody.c \
 src/http/l_http_response_head.c \
 src/http/l_http_request_head.c \
 src/lktp/l_lktp_head.c \
 src/lktp/l_lktp_body.c \
-src/app/l_serv.c \
 src/app/l_perform.c \
 src/app/l_tunnel.c \
 src/app/l_webserver.c \
+src/apis/l_webapi.c \
 \
 src/test/l_ts_list.c \
 src/test/l_ts_queue.c \
