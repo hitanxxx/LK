@@ -6,7 +6,7 @@ static int32 log_fd_access = 0;
 static string_t levels[] = {
 	string("[ ERROR ]"),
 	string("[ DEBUG ]"),
-	string("[ INFO ]")
+	string("[ INFO  ]")
 };
 
 // log_format_time ----------
