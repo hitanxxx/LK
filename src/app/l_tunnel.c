@@ -26,8 +26,14 @@ static status tunnel_free( tunnel_t * t )
 		t->local_recv_chain.start;
 	t->local_recv_chain.next = NULL;
 
-	t->in = NULL;
-	t->out = NULL;
+	memset( t->buffer_in, 0, sizeof(t->buffer_in) );
+	memset( t->buffer_out, 0, sizeof(t->buffer_out) );
+	t->in.pos = t->in.last = t->in.start;
+	t->out.pos = t->out.last = t->out.start;
+	t->in_busy = 0;
+	t->out_busy = 0;
+	t->in_recv_error = 0;
+	t->out_recv_error = 0;
 
 	t->request_head = NULL;
 	t->request_body = NULL;
@@ -93,12 +99,7 @@ static status tunnel_close_tunnel( tunnel_t * t )
 	if( t->response_body ) {
 		http_entitybody_free( t->response_body );
 	}
-	if( t->in ) {
-		net_transport_free( t->in );
-	}
-	if( t->out ) {
-		net_transport_free( t->out );
-	}
+
 	tunnel_free( t );
 	return OK;
 }
@@ -137,135 +138,191 @@ static void tunnel_time_out( void * data )
 	debug_log ( "%s ---", __func__ );
 	tunnel_over( t );
 }
-
-// https_remote_recv ----
-static status https_remote_recv ( event_t * ev )
+// https_in_transport ----
+static status https_in_transport ( event_t * ev )
 {
-	connection_t * c;
 	tunnel_t * t;
-
-	c = ev->data;
-	t = c->data;
-	t->downstream->read->timer.data = (void*)t;
-	t->downstream->read->timer.handler = tunnel_time_out;
-	timer_add( &t->downstream->read->timer, TUNNEL_TIMEOUT );
-
-	if( ERROR == net_transport( t->in, 0 ) ) {
-		err_log( "%s --- ", __func__ );
-		tunnel_over( t );
-		return ERROR;
-	}
-	return OK;
-}
-// https_remote_send ----
-static status https_remote_send ( event_t * ev )
-{
-	connection_t * c;
-	tunnel_t * t;
+	connection_t *c, * down, *up;
+	ssize_t rc;
 
 	c = ev->data;
 	t = c->data;
 
-	if( ERROR == net_transport( t->out, 1 ) ) {
-		err_log( "%s --- ", __func__ );
-		tunnel_over( t );
-		return ERROR;
+	down = t->downstream;
+	up = t->upstream;
+	while( 1 ) {
+		if( t->in_busy ) {
+			if( t->in.pos == t->in.last ) {
+				t->in_busy = 0;
+				t->in.pos = t->in.last = t->in.start;
+				if( t->in_recv_error ) {
+					tunnel_over( t );
+					return ERROR;
+				}
+				continue;
+			}
+			rc = down->send( down, t->in.pos,
+			 	meta_len( t->in.pos, t->in.last ));
+			if( rc == ERROR ) {
+				tunnel_over( t );
+				return ERROR;
+			} else if ( rc == AGAIN ) {
+				up->read->timer.data = (void*)t;
+				up->read->timer.handler = tunnel_time_out;
+				timer_add( &up->read->timer, TUNNEL_TIMEOUT );
+				return AGAIN;
+			} else {
+				t->in.pos += rc;
+			}
+		}
+		if( !t->in_busy ) {
+			if( t->in.last == t->in.end ) {
+				t->in_busy = 1;
+				continue;
+			}
+			rc = up->recv( up, t->in.last,
+				meta_len( t->in.last, t->in.end ) );
+			t->in_busy = ( t->in.pos < t->in.last ) ? 1 : 0;
+			if( rc == ERROR ) {
+				t->in_recv_error = 1;
+				if( t->in_busy ) {
+					continue;
+				}
+				tunnel_over( t );
+				return ERROR;
+			} else if ( rc == AGAIN ) {
+				if( t->in_busy ) {
+					continue;
+				}
+				up->read->timer.data = (void*)t;
+				up->read->timer.handler = tunnel_time_out;
+				timer_add( &up->read->timer, TUNNEL_TIMEOUT );
+				return AGAIN;
+			} else {
+				t->in.last += rc;
+			}
+		}
 	}
 	return OK;
 }
-// https_local_recv ----
-static status https_local_recv ( event_t * ev )
+// https_out_transport ----
+static status https_out_transport ( event_t * ev )
 {
-	connection_t * downstream;
 	tunnel_t * t;
+	connection_t *c, * down, *up;
+	ssize_t rc;
 
-	downstream = ev->data;
-	t = downstream->data;
-	t->downstream->read->timer.data = (void*)t;
-	t->downstream->read->timer.handler = tunnel_time_out;
-	timer_add( &t->downstream->read->timer, TUNNEL_TIMEOUT );
+	c = ev->data;
+	t = c->data;
 
-	if( ERROR == net_transport( t->out, 0 ) ) {
-		err_log( "%s --- ", __func__ );
-		tunnel_over( t );
-		return ERROR;
-	}
-	return OK;
-}
-// https_local_send ----
-static status https_local_send ( event_t * ev )
-{
-	connection_t * downstream;
-	tunnel_t * t;
-
-	downstream = ev->data;
-	t = downstream->data;
-	if( ERROR == net_transport( t->in, 1 ) ) {
-		err_log( "%s --- ", __func__ );
-		tunnel_over( t );
-		return ERROR;
+	down = t->downstream;
+	up = t->upstream;
+	while( 1 ) {
+		if( t->out_busy ) {
+			if( t->out.pos == t->out.last ) {
+				t->out_busy = 0;
+				t->out.pos = t->out.last = t->out.start;
+				if( t->out_recv_error ) {
+					tunnel_over( t );
+					return ERROR;
+				}
+				continue;
+			}
+			rc = up->send( up, t->out.pos,
+			 	meta_len( t->out.pos, t->out.last ));
+			if( rc == ERROR ) {
+				tunnel_over( t );
+				return ERROR;
+			} else if ( rc == AGAIN ) {
+				down->read->timer.data = (void*)t;
+				down->read->timer.handler = tunnel_time_out;
+				timer_add( &down->read->timer, TUNNEL_TIMEOUT );
+				return AGAIN;
+			} else {
+				t->out.pos += rc;
+			}
+		}
+		if( !t->out_busy ) {
+			if( t->out.last == t->out.end ) {
+				t->out_busy = 1;
+				continue;
+			}
+			rc = down->recv( down, t->out.last,
+				meta_len( t->out.last, t->out.end ) );
+			t->out_busy = ( t->out.pos < t->out.last ) ? 1 : 0;
+			if( rc == ERROR ) {
+				t->out_recv_error = 1;
+				if( t->out_busy ) {
+					continue;
+				}
+				tunnel_over( t );
+				return ERROR;
+			} else if ( rc == AGAIN ) {
+				if( t->out_busy ) {
+					continue;
+				}
+				down->read->timer.data = (void*)t;
+				down->read->timer.handler = tunnel_time_out;
+				timer_add( &down->read->timer, TUNNEL_TIMEOUT );
+				return AGAIN;
+			} else {
+				t->out.last += rc;
+			}
+		}
 	}
 	return OK;
 }
 // https_start ------
 static status https_start( event_t * ev )
 {
-	connection_t * upstream;
+	connection_t * c;
 	tunnel_t * t;
 
-	upstream = ev->data;
-	t = upstream->data;
-	if( OK != net_transport_alloc( &t->in ) ) {
-		err_log( "%s --- transport in", __func__ );
-		tunnel_over( t );
-		return ERROR;
-	}
-	if( OK != net_transport_alloc( &t->out ) ) {
-		err_log( "%s --- transport out", __func__ );
-		tunnel_over( t );
-		return ERROR;
-	}
-	t->in->recv_connection = t->upstream;
-	t->in->send_connection = t->downstream;
-	t->out->recv_connection = t->downstream;
-	t->out->send_connection = t->upstream;
+	c = ev->data;
+	t = c->data;
 
-	t->upstream->read->handler = https_remote_recv;
-	t->downstream->write->handler = https_local_send;
-	t->downstream->read->handler = https_local_recv;
-	t->upstream->write->handler = https_remote_send;
+	t->downstream->read->handler = https_out_transport;
+	t->upstream->write->handler = https_out_transport;
+
+	t->upstream->read->handler = https_in_transport;
+	t->downstream->write->handler = https_in_transport;
+
+	t->in.pos = t->in.last = t->in.start = t->buffer_in;
+	t->in.end = t->in.start + TUNNEL_TRANSPORT_BUFFER;
+
+	t->out.pos = t->out.last = t->out.start = t->buffer_out;
+	t->out.end = t->out.start + TUNNEL_TRANSPORT_BUFFER;
 
 	event_opt( t->upstream->read, EVENT_READ );
 	event_opt( t->downstream->write, EVENT_WRITE );
 	event_opt( t->downstream->read, EVENT_READ );
 	event_opt( t->upstream->write, EVENT_WRITE );
-	return t->downstream->read->handler( t->downstream->read );
+	return AGAIN;
 }
 // https_connected ------
 static status https_connected( event_t * ev )
 {
-	connection_t * downstream;
+	connection_t * down;
 	tunnel_t * t;
 	status rc;
 
-	downstream = ev->data;
-	t = downstream->data;
-	rc = t->downstream->send_chain( t->downstream, &t->established );
+	down = ev->data;
+	t = down->data;
+	rc = down->send_chain( down, &t->established );
 	if( rc == ERROR ) {
 		err_log( "%s --- send error", __func__ );
 		tunnel_over( t );
 		return ERROR;
 	} else if( rc == DONE ) {
-		timer_del( &t->downstream->write->timer );
+		timer_del( &down->write->timer );
 		debug_log ( "%s --- 200 established success", __func__ );
-		t->downstream->write->handler = NULL;
-		t->downstream->read->handler = NULL;
-		t->upstream->write->handler = https_start;
-		return t->upstream->write->handler( t->downstream->read );
+
+		down->read->handler = https_start;
+		return down->read->handler( down->read );
 	}
-	t->downstream->write->timer.data = (void*)t;
-	t->downstream->write->timer.handler = tunnel_time_out;
-	timer_add( &t->downstream->write->timer, TUNNEL_TIMEOUT );
+	down->write->timer.data = (void*)t;
+	down->write->timer.handler = tunnel_time_out;
+	timer_add( &down->write->timer, TUNNEL_TIMEOUT );
 	return rc;
 }
 // tunnel_process_finish ---------
@@ -613,6 +670,7 @@ static status tunnel_start( event_t * ev )
 	downstream = t->downstream;
 
 	if( !t->https ) {
+		debug_log("%s --- http request", __func__ );
 		downstream->read->handler = NULL;
 		downstream->write->handler = NULL;
 		upstream->read->handler = NULL;
@@ -620,6 +678,7 @@ static status tunnel_start( event_t * ev )
 		upstream->write->handler = http_remote_send;
 		return upstream->write->handler( upstream->write );
 	}
+	debug_log("%s --- https request", __func__ );
 	t->established.start = t->established.pos = global_response;
 	t->established.end = t->established.last = (global_response + l_strlen(global_response) );
 

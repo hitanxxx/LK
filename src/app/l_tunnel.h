@@ -7,6 +7,8 @@
 #define		TUNNEL_SERVER	0x0201
 #define		TUNNEL_SINGLE	0x0202
 
+#define 	TUNNEL_TRANSPORT_BUFFER	40960
+
 typedef struct tunnel_t {
 	queue_t				queue;
 	connection_t * 		downstream;
@@ -17,8 +19,15 @@ typedef struct tunnel_t {
 	meta_t 	   			established;
 	meta_t 				local_recv_chain;
 
-	net_transport_t	* 	in;
-	net_transport_t * 	out;
+	// transport values
+	char 	buffer_in[TUNNEL_TRANSPORT_BUFFER];
+	char 	buffer_out[TUNNEL_TRANSPORT_BUFFER];
+	meta_t	in;
+	meta_t	out;
+	uint32	out_busy;
+	uint32	in_busy;
+	uint32	out_recv_error;
+	uint32	in_recv_error;
 
 	http_request_head_t *	request_head;
 	http_entitybody_t * 	request_body;
