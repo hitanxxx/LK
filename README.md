@@ -1,14 +1,13 @@
 # LK
 
 # Introduce
-LK 是一个ANSI C编写的运行在linux类操作系统环境的事件驱动网络框架。且linux的内核版本需要高于2.4。
-除此之外。还额外的包括三个有趣，有用的功能模块：
+LK 的本意是构建一个web框架，不过web框架多如过江之鲤。更何况其他框架都用脚本了，LK还得写代码。所以还是说说它能干吗。它现在有3个模块：
 ## LK-PERF
-lk-perf 一个通过json与UI传输数据的一个web应用性能测试工具。通过UI的echarts js实现数据可视化，多进程模型，支持多用例混合。通过UI可以直观的看到web应用测试用例的性能对比。
+lk-perf 多进程事件驱动，数据可视化的，web应用性能测试软件。web前端用echarts js实现数据可视化，通过UI可以方便的设置多web应用测试用例，直观的进行对比。
 ## LK-TUNNEL
-lk-tunnel 一个简单的http proxy，同时也是一个SSL tunnel。在树莓派module b（1GB ddr2）上运行。观看两个https的720p 50fps的视频，内存占用率为2%。 lk-tunnel使用时可以被监测到请求头。一个有意思的用法是搭配lk-perf来使用，发送大量的无用请求。混淆真实请求。
+lk-tunnel 无状态，无缓存的http proxy，SSL tunnel。跑在树莓派module b（1GB ddr2）上运行。看youtube的720p的视频，cpu使用率以及内存占用率为2%。一个有意思的用法是搭配lk-perf来使用，佐以大量的假请求。混淆真实请求。
 ## LK-WEB
-lk-web 一个web服务器，提供一个简单的路由规则支持的类REST api服务。以及静态文件服务。后面可以看到静态文件服务的性能测试。
+lk-web 一个web服务器，有一个简单的路由支持类似rest api（严格来说不是restful）服务。以及静态文件服务。
 
 # Install
 lk的功能模块需要OpenSSL库。解决依赖后。在文件目录运行：
