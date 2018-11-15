@@ -9,9 +9,9 @@ static string_t response_string_400 = string("HTTP/1.1 400 Bad Request\r\n"
 "Connection: Close\r\n"
 "Server: lk-v1.0\r\n"
 "Content-type: text/html\r\n"
-"Content-Length: 78\r\n\r\n"
-"<html><title>400 bad webser</title><body>"
-"<h1>400 Bad webser</h1>"
+"Content-Length: 80\r\n\r\n"
+"<html><title>400 bad Request</title><body>"
+"<h1>400 bad Request</h1>"
 "</body></html>");
 // 403
 static string_t response_string_403 = string("HTTP/1.1 403 Forbidden\r\n"
