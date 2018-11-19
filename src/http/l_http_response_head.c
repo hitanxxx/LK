@@ -456,7 +456,7 @@ status http_response_head_init_module ( void )
 status http_response_head_end_module( void )
 {
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 	}
 	return OK;
 }

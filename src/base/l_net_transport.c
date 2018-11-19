@@ -115,7 +115,7 @@ status net_transport_free( net_transport_t * t )
 		meta_free( t->send_meta );
 		t->send_meta = meta;
 	}
-	free( t );
+	l_safe_free( t );
 	return OK;
 }
 // net_transport_alloc ------------

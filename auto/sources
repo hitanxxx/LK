@@ -12,6 +12,7 @@ src/apis \
 
 DEPS="src/lk_global.h \
 src/lk.h \
+src/base/l_mem.h \
 src/base/l_config.h \
 src/base/l_time.h \
 src/base/l_string.h \
@@ -46,6 +47,7 @@ src/util/l_bheap.h \
 "
 
 SRCS="src/lk.c \
+src/base/l_mem.c \
 src/base/l_time.c \
 src/base/l_string.c \
 src/base/l_meta.c \
@@ -78,6 +80,7 @@ src/app/l_tunnel.c \
 src/app/l_webserver.c \
 src/apis/l_webapi.c \
 \
+src/test/l_ts_mem.c \
 src/test/l_ts_list.c \
 src/test/l_ts_queue.c \
 src/test/l_ts_bst.c \

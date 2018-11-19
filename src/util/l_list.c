@@ -32,7 +32,7 @@ void * mem_list_push( mem_list_t * list )
 
 	new->data = l_safe_malloc( list->elem_size );
 	if( !new->data ) {
-		free( new );
+		l_safe_free( new );
 		return NULL;
 	}
 	memset( new->data, 0, list->elem_size );
@@ -58,11 +58,11 @@ status mem_list_free( mem_list_t * list )
 	current = list->head;
 	while( current ) {
 		next = current->next;
-		free( current->data );
-		free( current );
+		l_safe_free( current->data );
+		l_safe_free( current );
 		current = next;
 	}
-	free( list );
+	l_safe_free( list );
 	return OK;
 }
 // mem_list_get ----------------------------------------------

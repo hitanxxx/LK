@@ -7,9 +7,6 @@
 #define		TUNNEL_SERVER	0x0201
 #define		TUNNEL_SINGLE	0x0202
 
-// default ipv4 recv buffer size
-#define 	TUNNEL_TRANSPORT_BUFFER	87380
-
 typedef struct tunnel_t {
 	queue_t				queue;
 	connection_t * 		downstream;

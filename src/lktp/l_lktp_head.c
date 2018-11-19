@@ -246,7 +246,7 @@ status lktp_head_init( void )
 status lktp_head_end( void )
 {
     if( pool ) {
-        free( pool );
+        l_safe_free( pool );
     }
     pool = NULL;
     return OK;

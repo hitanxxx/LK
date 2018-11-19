@@ -148,7 +148,7 @@ static status webser_close( webser_t * webser )
 {
 	meta_t * meta, *cl;
 
-	// free headers_in mem_list
+	// l_safe_free headers_in mem_list
 	if( webser->request_head ) {
 		http_request_head_free( webser->request_head );
 	}
@@ -767,7 +767,7 @@ status webser_process_init( void )
 status webser_process_end( void )
 {
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 		pool = NULL;
 	}
 	return OK;

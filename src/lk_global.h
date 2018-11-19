@@ -63,6 +63,7 @@
 #define 	HTTP_PARSE_INVALID_HEADER					13
 
 #define l_unused( x ) 			 	((void)x)
+#define l_safe_free( x )			(free(x))
 #define l_safe_malloc( len )		(malloc((size_t)(len)))
 #define l_memcpy( dst, src, len )	(memcpy((char*)dst, (char*)src, (size_t)len))
 #define l_strlen( str )				((uint32)strlen( str ))

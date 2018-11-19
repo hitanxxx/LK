@@ -177,7 +177,7 @@ status lktp_body_init( void )
 status lktp_body_end( void )
 {
     if( pool ) {
-        free( pool );
+        l_safe_free( pool );
     }
     pool = NULL;
     return OK;

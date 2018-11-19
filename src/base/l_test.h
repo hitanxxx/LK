@@ -13,11 +13,11 @@ if( !(x) ) { \
 t_echo( ERROR,""#x" false");\
 failed_num++;\
 }
- 
+
 
 #define BLOCK_MAX_NUM 1024
 uint32 failed_num;
-  
+
 typedef void ( * test_init_pt )( void );
 typedef void ( * test_pt ) ( void );
 typedef struct test_t {
@@ -34,6 +34,7 @@ extern void ts_bst_init( void );
 extern void ts_bheap_init( void );
 extern void ts_json_init( void );
 extern void ts_str_init( void );
+extern void ts_mem_init( void );
 
 status test_add ( test_pt pt );
 status test_run( void );

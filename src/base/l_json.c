@@ -784,12 +784,12 @@ status json_decode( json_t ** json, char * p, char * end )
 static status json_free_token( json_t * json )
 {
 	uint32 i;
-	json_t * free;
+	json_t * l_safe_free;
 
 	if( json->list != NULL ) {
 		for( i=1; i <= json->list->elem_num; i ++ ) {
-			free = mem_list_get( json->list, i );
-			json_free_token( free );
+			l_safe_free = mem_list_get( json->list, i );
+			json_free_token( l_safe_free );
 		}
 		mem_list_free( json->list );
 	}
@@ -801,7 +801,7 @@ status json_free( json_t * json )
 	if( OK != json_free_token( json ) ) {
 		return ERROR;
 	}
-	free( json );
+	l_safe_free( json );
 	return OK;
 }
 // json_stringify_token_len -------
@@ -999,7 +999,7 @@ status json_create( json_t ** json )
 	}
 	memset( new, 0, sizeof(json_t) );
 	if( OK != mem_list_create( &new->list, sizeof(json_t) ) ) {
-		free( new );
+		l_safe_free( new );
 		return ERROR;
 	}
 	*json = new;

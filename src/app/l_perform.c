@@ -185,7 +185,7 @@ static status perf_over( perform_t * p, status rc )
 		} else if ( 500 <= RES_CODE(p) && RES_CODE(p) < 600 ) {
 			performance_count_change( &perform_5xx[p->pipeline_index], 1 );
 		}
-		// if keep alive on, don't free the connection, set a keepalive timer
+		// if keep alive on, don't l_safe_free the connection, set a keepalive timer
 		if( p->response_head->keepalive && perf_settings.keepalive ) {
 			c->read->handler = perf_test_reading;
 			c->write->handler = NULL;
@@ -373,11 +373,20 @@ static status perf_send_prepare_request( perform_pipeline_t * pipeline )
 			}
 		}
 	}
-
-	if( OK != meta_alloc( &pipeline->request_meta, request_length ) ) {
-		err_log(  "%s --- new alloc error", __func__ );
+	// build request string
+	pipeline->request_meta = l_mem_alloc( pipeline->page, request_length +
+ 	(uint32)sizeof(meta_t) );
+	if( !pipeline->request_meta ) {
+		err_log("%s --- mem alloc pipeline's request meta", __func__ );
 		return ERROR;
 	}
+	memset( pipeline->request_meta, 0, request_length + sizeof(meta_t) );
+	pipeline->request_meta->next = NULL;
+	pipeline->request_meta->data = (char*)pipeline->request_meta + (uint32)sizeof(meta_t);
+	pipeline->request_meta->start = pipeline->request_meta->pos =
+	pipeline->request_meta->last = pipeline->request_meta->data;
+	pipeline->request_meta->end = pipeline->request_meta->start + request_length;
+
 	p = pipeline->request_meta->data;
 	// method uri HTTP/1.1\r\n
 	memcpy( p, pipeline->method.data, pipeline->method.len );
@@ -826,18 +835,7 @@ static status performance_setting_end( void )
 	if( perf_settings.list_pipeline ) {
 		for( i = 0; i < perf_settings.list_pipeline->elem_num; i ++ ) {
 			pipeline = mem_list_get( perf_settings.list_pipeline, i+1 );
-			free( pipeline->ip.data );
-			free( pipeline->method.data );
-			free( pipeline->uri.data );
-			free( pipeline->host.data );
-			if( pipeline->body.len > 0 ) {
-				free( pipeline->body.data );
-				pipeline->body.len = 0;
-			}
-			if( pipeline->request_meta ) {
-				meta_free( pipeline->request_meta );
-				pipeline->request_meta = NULL;
-			}
+			l_mem_free_page( pipeline->page );
 		}
 		mem_list_free( perf_settings.list_pipeline );
 		perf_settings.list_pipeline = NULL;
@@ -909,6 +907,10 @@ static status performance_setting_init( json_t * json )
 	mem_list_create( &perf_settings.list_pipeline, sizeof(perform_pipeline_t) );
 	for( i = 1; i <= x->list->elem_num; i ++ ) {
 		pipeline = mem_list_push( perf_settings.list_pipeline );
+		if( OK != l_mem_create_page( &pipeline->page, 4096 ) ) {
+			err_log("%s --- mem page create", __func__ );
+			return ERROR;
+		}
 		memset( &pipeline->addr, 0, sizeof(pipeline->addr) );
 		json_get_child( x, i, &t );
 
@@ -944,7 +946,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->https = https;
 		pipeline->port = port;
 		pipeline->ip.len = ip.len;
-		pipeline->ip.data = (char*)l_safe_malloc( pipeline->ip.len );
+		pipeline->ip.data = l_mem_alloc( pipeline->page, pipeline->ip.len );
 		if( !pipeline->ip.data ) {
 			err_log("%s --- l_safe_malloc ip data", __func__ );
 			return ERROR;
@@ -958,7 +960,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->addr.sin_port = htons( pipeline->port );
 		// ---
 		pipeline->host.len = host.len;
-		pipeline->host.data = (char*)l_safe_malloc( pipeline->host.len );
+		pipeline->host.data = l_mem_alloc( pipeline->page, pipeline->host.len );
 		if( !pipeline->host.data ) {
 			err_log(  "%s --- l_safe_malloc host data", __func__ );
 			return ERROR;
@@ -966,7 +968,7 @@ static status performance_setting_init( json_t * json )
 		memcpy( pipeline->host.data, host.data, host.len );
 		// ---
 		pipeline->method.len = method.len;
-		pipeline->method.data = (char*)l_safe_malloc( pipeline->method.len );
+		pipeline->method.data = l_mem_alloc( pipeline->page, pipeline->method.len );
 		if( !pipeline->method.data ) {
 			err_log(  "%s --- l_safe_malloc method data", __func__ );
 			return ERROR;
@@ -974,7 +976,7 @@ static status performance_setting_init( json_t * json )
 		memcpy( pipeline->method.data, method.data, method.len );
 		// ---
 		pipeline->uri.len = uri.len;
-		pipeline->uri.data = (char*)l_safe_malloc( pipeline->uri.len );
+		pipeline->uri.data = l_mem_alloc( pipeline->page, pipeline->uri.len );
 		if( !pipeline->uri.data ) {
 			err_log(  "%s --- l_safe_malloc uri data", __func__ );
 			return ERROR;
@@ -996,7 +998,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->method.len, pipeline->method.data );
 		if ( OK == json_get_obj_str( t, "body", l_strlen("body"), &v ) ) {
 			pipeline->body.len = v->name.len;
-			pipeline->body.data = (char*)l_safe_malloc( pipeline->body.len );
+			pipeline->body.data = l_mem_alloc( pipeline->page, pipeline->body.len );
 			if( !pipeline->body.data ) {
 				err_log(  "%s --- l_safe_malloc body data", __func__ );
 				return ERROR;
@@ -1122,7 +1124,7 @@ status perform_process_init( void )
 status perform_process_end( void )
 {
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 	}
 	return OK;
 }

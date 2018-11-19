@@ -14,7 +14,7 @@ status heap_create( heap_t ** heap, uint32 size )
 	
 	new->array = (void*)l_safe_malloc( sizeof(heap_node_t*)*(size+1) );
 	if( !new->array ) {
-		free( new ); 
+		l_safe_free( new ); 
 		return ERROR;
 	}
 	memset( new->array, 0, sizeof(heap_node_t*)*(size+1) ); 
@@ -29,8 +29,8 @@ status heap_create( heap_t ** heap, uint32 size )
 // heap_free ---------------
 status heap_free( heap_t * heap )
 {
-	free( heap->array );
-	free( heap );
+	l_safe_free( heap->array );
+	l_safe_free( heap );
 	heap = NULL;
 	return OK;
 }

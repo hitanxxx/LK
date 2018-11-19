@@ -16,6 +16,7 @@ typedef struct perform_setting_t {
 } perform_setting_t;
 
 typedef struct perform_pipeline_t {
+	l_mem_page_t *		page;
 	struct sockaddr_in 	addr;
 	meta_t*		request_meta;
 
@@ -33,7 +34,6 @@ typedef struct perform_t perform_t;
 typedef status (*perform_handler)( perform_t * );
 struct perform_t {
 	queue_t					queue;
-	// peer connection
 	connection_t* 			c;
 	perform_handler 		handler;
 

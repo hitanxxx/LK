@@ -36,7 +36,7 @@ status meta_alloc( meta_t ** meta, uint32 size )
 
 	new->data = (char*)l_safe_malloc( size*sizeof(char) );
 	if( !new->data ) {
-		free( new );
+		l_safe_free( new );
 		return ERROR;
 	}
 	memset( new->data, 0, size*sizeof(char) );
@@ -51,10 +51,10 @@ status meta_free( meta_t * meta )
 {
 	if( !meta->file_flag ) {
 		if( meta->data ) {
-			free( meta->data );
+			l_safe_free( meta->data );
 		}
 	}
-	free( meta );
+	l_safe_free( meta );
 	meta = NULL;
 	return OK;
 }

@@ -625,7 +625,7 @@ status http_request_head_init_module( void )
 status http_request_head_end_module( void )
 {
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 		pool = NULL;
 	}
 	return OK;

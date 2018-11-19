@@ -3,6 +3,7 @@
 static manager_t manager;
 
 static test_init_pt init_t[] = {
+	ts_mem_init,
 	ts_list_init,
 	ts_queue_init,
 	ts_bst_init,

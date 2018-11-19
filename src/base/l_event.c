@@ -379,7 +379,7 @@ status event_process_end( void )
 		close( event_fd );
 	}
 	if( events ) {
-		free( events );
+		l_safe_free( events );
 	}
 	return OK;
 }

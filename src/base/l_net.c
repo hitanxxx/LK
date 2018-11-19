@@ -169,10 +169,10 @@ status net_end( void )
 {
 	uint32 i;
 	if( read_pool ){
-		free( read_pool );
+		l_safe_free( read_pool );
 	}
 	if( write_pool ) {
-		free( write_pool );
+		l_safe_free( write_pool );
 	}
 
 	for( i = 0; i < MAXCON; i ++ ) {
@@ -182,7 +182,7 @@ status net_end( void )
 		}
 	}
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 	}
 	return OK;
 }

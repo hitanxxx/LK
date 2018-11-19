@@ -61,7 +61,7 @@ static status upstream_free_connection( event_t * ev )
 		net_free( up->upstream );
 		up->upstream = NULL;
 	}
-	free( up );
+	l_safe_free( up );
 	return OK;
 }
 // upstream_free -------------------------

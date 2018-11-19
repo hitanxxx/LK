@@ -360,7 +360,7 @@ status http_entitybody_init_module( void )
 status http_entitybody_end_module( void )
 {
 	if( pool ) {
-		free( pool );
+		l_safe_free( pool );
 		pool = NULL;
 	}
 	return OK;

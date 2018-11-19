@@ -29,7 +29,7 @@ status ssl_shutdown( ssl_connection_t * ssl )
 	c = ssl->data;
 	if( SSL_in_init( c->ssl->con ) ) {
 		SSL_free( c->ssl->con );
-		free( c->ssl );
+		l_safe_free( c->ssl );
 		c->ssl = NULL;
 		c->ssl_flag = 0;
 		return OK;
@@ -40,7 +40,7 @@ status ssl_shutdown( ssl_connection_t * ssl )
 	}
 	if( n == 1 || ssler == 0 || ssler == SSL_ERROR_ZERO_RETURN ) {
 		SSL_free( c->ssl->con );
-		free( c->ssl );
+		l_safe_free( c->ssl );
 		c->ssl = NULL;
 		c->ssl_flag = 0;
 		return OK;
@@ -57,7 +57,7 @@ status ssl_shutdown( ssl_connection_t * ssl )
 		return AGAIN;
 	}
 	SSL_free( c->ssl->con );
-	free( c->ssl );
+	l_safe_free( c->ssl );
 	c->ssl = NULL;
 	c->ssl_flag = 0;
 	return ERROR;
@@ -294,7 +294,7 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 	sc->con = SSL_new( ctx );
 	if( !sc->con ) {
 		err_log ( "%s --- SSL_new null", __func__ );
-		free( sc );
+		l_safe_free( sc );
 		return ERROR;
 	}
 	sc->data = (void*)c;
@@ -302,7 +302,7 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 	if( SSL_set_fd( sc->con, c->fd ) == 0 ) {
 		err_log ( "%s --- SSL_set_fd", __func__ );
 		SSL_free( sc->con );
-		free( sc );
+		l_safe_free( sc );
 		return ERROR;
 	}
 	if( flag == L_SSL_CLIENT ) {
@@ -313,7 +313,7 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 	if( SSL_set_ex_data( sc->con, ssl_con_index, c ) == 0 ) {
 		err_log ( "%s --- set_ex_data", __func__ );
 		SSL_free( sc->con );
-		free( sc );
+		l_safe_free( sc );
 		return ERROR;
 	}
 	c->ssl = sc;

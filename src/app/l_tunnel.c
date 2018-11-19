@@ -1036,7 +1036,7 @@ status tunnel_process_init( void )
 status tunnel_process_end( void )
 {
 	if( pool ) {
-        free( pool );
+        l_safe_free( pool );
     }
     pool = NULL;
 	return OK;
