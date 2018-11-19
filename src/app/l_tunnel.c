@@ -26,14 +26,8 @@ static status tunnel_free( tunnel_t * t )
 		t->local_recv_chain.start;
 	t->local_recv_chain.next = NULL;
 
-	memset( t->buffer_in, 0, sizeof(t->buffer_in) );
-	memset( t->buffer_out, 0, sizeof(t->buffer_out) );
-	t->in.pos = t->in.last = t->in.start;
-	t->out.pos = t->out.last = t->out.start;
-	t->in_busy = 0;
-	t->out_busy = 0;
-	t->in_recv_error = 0;
-	t->out_recv_error = 0;
+	t->in = NULL;
+	t->out = NULL;
 
 	t->request_head = NULL;
 	t->request_body = NULL;
@@ -99,7 +93,12 @@ static status tunnel_close_tunnel( tunnel_t * t )
 	if( t->response_body ) {
 		http_entitybody_free( t->response_body );
 	}
-
+	if( t->in ) {
+		net_transport_free( t->in );
+	}
+	if( t->out ) {
+		net_transport_free( t->out );
+	}
 	tunnel_free( t );
 	return OK;
 }
@@ -138,138 +137,88 @@ static void tunnel_time_out( void * data )
 	debug_log ( "%s ---", __func__ );
 	tunnel_over( t );
 }
-// https_in_transport ----
-static status https_in_transport ( event_t * ev )
+// tunnel_transport_out_recv ------
+static status tunnel_transport_out_recv( event_t * ev )
 {
+	connection_t * c;
+	status rc;
 	tunnel_t * t;
-	connection_t *c, * down, *up;
-	ssize_t rc;
 
 	c = ev->data;
 	t = c->data;
 
-	down = t->downstream;
-	up = t->upstream;
-	while( 1 ) {
-		if( t->in_busy ) {
-			if( t->in.pos == t->in.last ) {
-				t->in_busy = 0;
-				t->in.pos = t->in.last = t->in.start;
-				if( t->in_recv_error ) {
-					tunnel_over( t );
-					return ERROR;
-				}
-				continue;
-			}
-			rc = down->send( down, t->in.pos,
-			 	meta_len( t->in.pos, t->in.last ));
-			if( rc == ERROR ) {
-				tunnel_over( t );
-				return ERROR;
-			} else if ( rc == AGAIN ) {
-				up->read->timer.data = (void*)t;
-				up->read->timer.handler = tunnel_time_out;
-				timer_add( &up->read->timer, TUNNEL_TIMEOUT );
-				return AGAIN;
-			} else {
-				t->in.pos += rc;
-			}
-		}
-		if( !t->in_busy ) {
-			if( t->in.last == t->in.end ) {
-				t->in_busy = 1;
-				continue;
-			}
-			rc = up->recv( up, t->in.last,
-				meta_len( t->in.last, t->in.end ) );
-			t->in_busy = ( t->in.pos < t->in.last ) ? 1 : 0;
-			if( rc == ERROR ) {
-				t->in_recv_error = 1;
-				if( t->in_busy ) {
-					continue;
-				}
-				tunnel_over( t );
-				return ERROR;
-			} else if ( rc == AGAIN ) {
-				if( t->in_busy ) {
-					continue;
-				}
-				up->read->timer.data = (void*)t;
-				up->read->timer.handler = tunnel_time_out;
-				timer_add( &up->read->timer, TUNNEL_TIMEOUT );
-				return AGAIN;
-			} else {
-				t->in.last += rc;
-			}
-		}
+	rc = net_transport( t->out, 0 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport out recv failed", __func__ );
+		tunnel_over( t );
+		return ERROR;
 	}
-	return OK;
+	t->upstream->read->timer.data = (void*)t;
+	t->upstream->read->timer.handler = tunnel_time_out;
+	timer_add( &t->upstream->read->timer, TUNNEL_TIMEOUT );
+	return rc;
 }
-// https_out_transport ----
-static status https_out_transport ( event_t * ev )
+// tunnel_transport_out_send ------
+static status tunnel_transport_out_send( event_t * ev )
 {
+	connection_t * c;
+	status rc;
 	tunnel_t * t;
-	connection_t *c, * down, *up;
-	ssize_t rc;
 
 	c = ev->data;
 	t = c->data;
 
-	down = t->downstream;
-	up = t->upstream;
-	while( 1 ) {
-		if( t->out_busy ) {
-			if( t->out.pos == t->out.last ) {
-				t->out_busy = 0;
-				t->out.pos = t->out.last = t->out.start;
-				if( t->out_recv_error ) {
-					tunnel_over( t );
-					return ERROR;
-				}
-				continue;
-			}
-			rc = up->send( up, t->out.pos,
-			 	meta_len( t->out.pos, t->out.last ));
-			if( rc == ERROR ) {
-				tunnel_over( t );
-				return ERROR;
-			} else if ( rc == AGAIN ) {
-				down->read->timer.data = (void*)t;
-				down->read->timer.handler = tunnel_time_out;
-				timer_add( &down->read->timer, TUNNEL_TIMEOUT );
-				return AGAIN;
-			} else {
-				t->out.pos += rc;
-			}
-		}
-		if( !t->out_busy ) {
-			if( t->out.last == t->out.end ) {
-				t->out_busy = 1;
-				continue;
-			}
-			rc = down->recv( down, t->out.last,
-				meta_len( t->out.last, t->out.end ) );
-			t->out_busy = ( t->out.pos < t->out.last ) ? 1 : 0;
-			if( rc == ERROR ) {
-				t->out_recv_error = 1;
-				if( t->out_busy ) {
-					continue;
-				}
-				tunnel_over( t );
-				return ERROR;
-			} else if ( rc == AGAIN ) {
-				if( t->out_busy ) {
-					continue;
-				}
-				down->read->timer.data = (void*)t;
-				down->read->timer.handler = tunnel_time_out;
-				timer_add( &down->read->timer, TUNNEL_TIMEOUT );
-				return AGAIN;
-			} else {
-				t->out.last += rc;
-			}
-		}
+	rc = net_transport( t->out, 1 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport out send failed", __func__ );
+		tunnel_over( t );
+		return ERROR;
 	}
+	t->upstream->read->timer.data = (void*)t;
+	t->upstream->read->timer.handler = tunnel_time_out;
+	timer_add( &t->upstream->read->timer, TUNNEL_TIMEOUT );
+	return rc;
+}
+// tunnel_transport_in_recv ------
+static status tunnel_transport_in_recv( event_t * ev )
+{
+	connection_t * c;
+	status rc;
+	tunnel_t * t;
+
+	c = ev->data;
+	t = c->data;
+
+	rc = net_transport( t->in, 0 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport in recv failed", __func__ );
+		tunnel_over( t );
+		return ERROR;
+	}
+	t->downstream->read->timer.data = (void*)t;
+	t->downstream->read->timer.handler = tunnel_time_out;
+	timer_add( &t->downstream->read->timer, TUNNEL_TIMEOUT );
+	return rc;
+}
+// tunnel_transport_in_send ------
+static status tunnel_transport_in_send( event_t * ev )
+{
+	connection_t * c;
+	status rc;
+	tunnel_t * t;
+
+	c = ev->data;
+	t = c->data;
+
+	rc = net_transport( t->in, 1 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport in send failed", __func__ );
+		tunnel_over( t );
+		return ERROR;
+	}
+	t->downstream->read->timer.data = (void*)t;
+	t->downstream->read->timer.handler = tunnel_time_out;
+	timer_add( &t->downstream->read->timer, TUNNEL_TIMEOUT );
 	return OK;
 }
 // https_start ------
@@ -281,17 +230,27 @@ static status https_start( event_t * ev )
 	c = ev->data;
 	t = c->data;
 
-	t->downstream->read->handler = https_out_transport;
-	t->upstream->write->handler = https_out_transport;
+	if( OK != net_transport_alloc( &t->in ) ) {
+		err_log("%s --- net_transport in alloc", __func__ );
+		tunnel_over( t );
+		return ERROR;
+	}
+	if( OK != net_transport_alloc( &t->out ) ) {
+		err_log("%s --- net_transport out alloc", __func__ );
+		tunnel_over( t );
+		return ERROR;
+	}
+	t->in->recv_connection = t->downstream;
+	t->in->send_connection = t->upstream;
 
-	t->upstream->read->handler = https_in_transport;
-	t->downstream->write->handler = https_in_transport;
+	t->out->recv_connection = t->upstream;
+	t->out->send_connection = t->downstream;
 
-	t->in.pos = t->in.last = t->in.start = t->buffer_in;
-	t->in.end = t->in.start + TUNNEL_TRANSPORT_BUFFER;
+	t->downstream->read->handler = tunnel_transport_in_recv;
+	t->upstream->write->handler = tunnel_transport_in_send;
 
-	t->out.pos = t->out.last = t->out.start = t->buffer_out;
-	t->out.end = t->out.start + TUNNEL_TRANSPORT_BUFFER;
+	t->downstream->write->handler = tunnel_transport_out_send;
+	t->upstream->read->handler = tunnel_transport_out_recv;
 
 	event_opt( t->upstream->read, EVENT_READ );
 	event_opt( t->downstream->write, EVENT_WRITE );

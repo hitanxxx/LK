@@ -7,7 +7,7 @@
 #define		TUNNEL_SERVER	0x0201
 #define		TUNNEL_SINGLE	0x0202
 
-// default ipv4 recv buffer size 
+// default ipv4 recv buffer size
 #define 	TUNNEL_TRANSPORT_BUFFER	87380
 
 typedef struct tunnel_t {
@@ -20,15 +20,8 @@ typedef struct tunnel_t {
 	meta_t 	   			established;
 	meta_t 				local_recv_chain;
 
-	// transport values
-	char 	buffer_in[TUNNEL_TRANSPORT_BUFFER];
-	char 	buffer_out[TUNNEL_TRANSPORT_BUFFER];
-	meta_t	in;
-	meta_t	out;
-	uint32	out_busy;
-	uint32	in_busy;
-	uint32	out_recv_error;
-	uint32	in_recv_error;
+	net_transport_t * in;
+	net_transport_t * out;
 
 	http_request_head_t *	request_head;
 	http_entitybody_t * 	request_body;
