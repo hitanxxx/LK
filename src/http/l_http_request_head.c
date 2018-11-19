@@ -462,6 +462,10 @@ static status http_request_head_process_headers( http_request_head_t * request )
 			inet_ntoa( request->c->addr.sin_addr ),
 			user_agent.len,
 		 	user_agent.data );
+			//
+			access_log("%s --- [%.*s]", __func__, meta_len( request->c->meta->start, request->c->meta->pos ), request->c->meta->start );
+
+			access_log("%s --- [%.*s]", __func__, meta_len( request->c->meta->pos, request->c->meta->last ), request->c->meta->pos );
 
 			if( request->headers_in.content_length ) {
 				request->body_type = HTTP_ENTITYBODY_CONTENT;
