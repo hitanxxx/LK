@@ -29,7 +29,7 @@ status api_tunnel_setting( void * data )
 	webser = data;
 	return OK;
 }
-// api_proxy -------------------------------
+// api_proxy ---------------
 status api_proxy( void * data )
 {
 	webser_t * webser;

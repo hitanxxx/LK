@@ -23,10 +23,12 @@ lk的功能模块需要OpenSSL库。解决依赖后。在文件目录运行：
 > * /usr/local/lk/www  - HTML resource path
 
 # Command line parameters
-目前支持的命令行参数只有一个：
 * -stop </br>
 作用是停止后台所有lk进程。</br>
 stop all process when works in the backend
+* -reload </br>
+作用是重新启动子进程
+reload all worker process 
 
 # configuraction
 ```json
