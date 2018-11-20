@@ -58,8 +58,8 @@ audio.addEventListener( 'canplay', function task_finish () {
 	timer = setInterval( function() {
 		clearInterval(timer);
 		document.getElementById("disk_inring").src = arr_song_cover[arr_index];
-		document.getElementById("music_core_dec").style.background =
-		"url(" + arr_song_cover[arr_index] + ") no-repeat 0 center";
+		// document.getElementById("music_core_dec").style.background =
+		// "url(" + arr_song_cover[arr_index] + ") no-repeat 0 center";
 		task_state_change( false );
 		if( task_finish_play ) {
 			pause2play();

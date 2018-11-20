@@ -31,8 +31,8 @@ audio {
 }
 .glodec {
 	background-attachment:fixed;
-	background: url(https://i.loli.net/2018/11/20/5bf36a450e5ff.jpg) center;
-	position: absolute;
+	background: url(https://i.loli.net/2018/11/21/5bf43c463612f.jpg); center;
+    position: absolute;
 	top: 0px;
 	left: 0px;
 	height: 100%;
@@ -40,8 +40,8 @@ audio {
 	background-size: cover;
 	background-repeat:no-repeat;
 	filter: url(blur.svg#blur);
-	-webkit-filter: blur(1px) brightness(1.1) contrast(1.1) opacity(1);
-	-moz-filter: blur(1px);
+	-webkit-filter: blur(0.1px) brightness(1.1) contrast(1.1) opacity(1);
+	-moz-filter: blur(0.1px);
 	filter: progid:DXImageTransform.Microsoft.Blur(PixelRadius=10, MakeShadow=false); /* IE6~IE9 */
 }
 
@@ -72,7 +72,7 @@ audio {
 	#text-align: center;
 }
 .music_core_wall {
-	box-shadow:1px 1px 45px 15px black;
+	#box-shadow:1px 1px 45px 15px black;
 	position: absolute;
 	overflow: hidden;
 	width: 280px;
@@ -82,7 +82,7 @@ audio {
 	left: 50%;
 }
 .music_core_dec {
-	box-shadow:1px 1px 10px 1px black inset;
+	#box-shadow:1px 1px 10px 1px black inset;
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -90,8 +90,8 @@ audio {
 	width: 100%;
 	background-size: cover;
 	background-repeat:no-repeat;
-	-webkit-filter: blur(0.7px) brightness(1.1) contrast(1.1) opacity(1);
-	-moz-filter: blur(0.7px);
+	-webkit-filter: blur(8px) brightness(1.1) contrast(1.1) opacity(1);
+	-moz-filter: blur(8px);
 	filter: progid:DXImageTransform.Microsoft.Blur(PixelRadius=10, MakeShadow=false); /* IE6~IE9 */
 }
 .music_core_content {
@@ -168,7 +168,7 @@ animation-play-state: running;
 	margin: 0px -130px;
 	text-align: center;
 	top: 350px;
-	color:#d0d0d0 ;
+	color:#353535;
 }
 
 .footer {
@@ -177,11 +177,11 @@ animation-play-state: running;
 	font-size:13px;
 	width:100%;
 	bottom:0px;
-    color: #d0d0d0;
+    color: #353535;
 }
 .footer a:link {
 	text-decoration:none;
-	color:black;
+	color:pink;
 }
 .footer a:hover {
 	color:pink;
