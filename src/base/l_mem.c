@@ -63,7 +63,7 @@ void * l_mem_alloc( l_mem_page_t * page, uint32 size )
         q = cl;
         while( cl ) {
             p = cl->start;
-            if( (cl->end - p) >= size ) {
+            if( (uint32)(cl->end - p) >= size ) {
                 cl->start += size;
                 return p;
             }
