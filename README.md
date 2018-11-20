@@ -1,11 +1,11 @@
 # LK
 
 # Introduce
-LK 的本意是构建一个web框架，不过web框架多如过江之鲫。更何况其他框架都用脚本了，LK还得写代码。所以还是说说它能干吗。它现在有3个模块：
+LK 是ANSI C的一个web框架。有3个已经可以使用的应用模块：
 ## LK-PERF
 lk-perf 多进程事件驱动，数据可视化的，web应用性能测试软件。web前端用echarts js实现数据可视化，通过UI可以方便的设置多web应用测试用例，直观的进行对比。
 ## LK-TUNNEL
-lk-tunnel 无状态，无缓存的http proxy，SSL tunnel(fq模式)。性能高，占用资源极少。适合各种低性能的硬件环境。跑在1G DDR2 ram的树莓派上，看一个720p的视频，cpu与内存的使用率维持在2%。一个有意思的用法是搭配lk-perf来使用，佐以大量的假请求。混淆真实请求。
+lk-tunnel 无状态，无缓存的http proxy，SSL tunnel(翻墙模式)。性能高，占用资源极少。适合各种低性能的硬件环境。跑在1G DDR2 ram的树莓派上，看一个720p的视频，cpu与内存的使用率维持在2%。一个有意思的用法是搭配lk-perf来使用，佐以大量的假请求。混淆真实请求。
 ## LK-WEB
 lk-web 一个web服务器，有一个简单的路由支持类似rest api（严格来说不是restful）服务。以及静态文件服务。
 
@@ -17,10 +17,10 @@ lk的功能模块需要OpenSSL库。解决依赖后。在文件目录运行：
 在 centos7 与 debian系raspbian上都成功编译。
 安装完成后，在/usr/local/lk目录可看到安装完成后的文件。
 运行/usr/local/lk/sbin目录下的elf文件即可使用，但是使用之前可能需要了解配置。
-> * /usr/local/lk/conf - configuration file path
-> * /usr/local/lk/logs - log file, temp file path
-> * /usr/local/lk/sbin - elf file path
-> * /usr/local/lk/www  - HTML resource path
+> * /usr/local/lk/conf - 配置文件所在目录
+> * /usr/local/lk/logs - pid，日志，缓冲文件所在目录
+> * /usr/local/lk/sbin - elf执行文件所在目录
+> * /usr/local/lk/www  - HTML资源目录
 
 # Command line parameters
 * -stop </br>
@@ -62,34 +62,32 @@ reload all worker process
 
 }
 ```
-一个典型的配置文件如上，结构很简单，功能一目了然。
+一个典型的配置文件如上，结构划分为三个部分：
 the configuration file can be divided into three part:
-* global block
-> * daemon - daemon mode switch
-> * worker_process - number of worker_process
-> * reuse_port - socket's features
-> * accept_mutex - manual mutex lock
-> * log_error - error log of all
-> * log_debug - debug log of all
-> * sslcrt - ssl service needs
-> * sslkey - ssl service needs
-* http block
-> * access_log - http module access log
-> * keepalive - http/1.1 keepalive
-> * http listen - http listen ports
-> * https listen - https listen ports
-> * home - static file path
-> * index - static file default suffix
-* tunnel blcok
-> * mode - single/client/server
-> * serverip - client mode need specify 'serverip'
-* perf block
-> * switch - performance test mode switch
-# Other
-* 通过 /perform.html页面可以进入lk-perf的web页面。
-* tunnel的mode为single时，为proxy模式。默认7325端口。
-* 为server时，为ssl tunnel的server模式。
-* 为client时，为ssl tunnel的client模式，需要配置 serverip字段，制定一个server的ip地址。以与server组成SSL tunnel。默认7325端口。
+* 全局块，一般设置一些共享的信息。
+> * daemon - 守护进程开关
+> * worker_process - 工作进程数量，为0时，管理进程即为工作进程。
+> * reuse_port - socket特性，某些情景优化多进程竞争态。
+> * accept_mutex - 信号量锁开关。
+> * log_error - error日志开关。
+> * log_debug - debug日志开关。（影响性能）
+> * sslcrt - ssl证书文件。
+> * sslkey - ssl证书文件。
+* http 块，设置一些关于http的信息。
+> * access_log - http模块access日志
+> * keepalive - http长连接支持开关。
+> * http listen - http监听的端口。
+> * https listen - https监听的端口。
+> * home - HTML资源默认目录。
+> * index - HTML资源默认后缀。
+* tunnel 块，设置一些挂于tunnel的信息。
+> * mode - tunnel工作的模式：（single/server/client）
+> * serverip - 当mode为client的时候需要额外指定serverip。
+* perf 块，指定性能测试模块的信息。
+> * switch - 是否开启性能测试模块。如果开启。将只有最后一个启动的工作进程监听。其余工作监听不监听，只用来性能测试。
+# Tips
+* 通过 /perform.html进入web应用性能测试的UI页面。
+* tunnel模块使用的端口为7324，7325。client/proxy使用7325。server使用7324。暂不能通过配置修改。
 # Benchmark
 ## lk-perf VS apachebench
 宿主 cpu为 3.8Ghz, 内存ddr4-2400，网络为千兆以太</br>
