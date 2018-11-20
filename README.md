@@ -3,7 +3,7 @@
 # Introduce
 LK 是ANSI C的一个web框架。有3个已经可以使用的应用模块：
 ## LK-PERF
-lk-perf 固定数量进程（非fork），事件驱动， 无锁，数据可视化的高性能，web应用性能测试模块。web前端用echarts js实现初略的数据可视化，通过UI可以方便的设置多web应用测试用例，直观的进行对比。
+lk-perf 固定数量进程（非大量fork），事件驱动， 无锁，数据可视化的高性能，web应用性能测试模块。web前端用echarts js实现初略的数据可视化，通过UI可以方便的设置多web应用测试用例，直观的进行对比。
 ## LK-TUNNEL
 lk-tunnel 无状态，无缓存的http proxy，SSL tunnel(翻墙模式)。性能高，占用资源极少。适合各种低性能的硬件环境。跑在1G DDR2 ram的树莓派上，看一个720p的视频，cpu与内存的使用率维持在2%。一个有意思的用法是搭配lk-perf来使用，佐以大量的假请求。混淆真实请求。
 ## LK-WEB
