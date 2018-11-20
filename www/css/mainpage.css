@@ -40,8 +40,8 @@ audio {
 	background-size: cover;
 	background-repeat:no-repeat;
 	filter: url(blur.svg#blur);
-	-webkit-filter: blur(0.2px) brightness(1.1) contrast(1.1) opacity(1);
-	-moz-filter: blur(1.5px);
+	-webkit-filter: blur(1px) brightness(1.1) contrast(1.1) opacity(1);
+	-moz-filter: blur(1px);
 	filter: progid:DXImageTransform.Microsoft.Blur(PixelRadius=10, MakeShadow=false); /* IE6~IE9 */
 }
 
@@ -72,7 +72,7 @@ audio {
 	#text-align: center;
 }
 .music_core_wall {
-	#box-shadow:1px 1px 45px 15px black;
+	box-shadow:1px 1px 45px 15px black;
 	position: absolute;
 	overflow: hidden;
 	width: 280px;
@@ -82,7 +82,7 @@ audio {
 	left: 50%;
 }
 .music_core_dec {
-	#box-shadow:1px 1px 10px 1px black inset;
+	box-shadow:1px 1px 10px 1px black inset;
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -91,7 +91,7 @@ audio {
 	background-size: cover;
 	background-repeat:no-repeat;
 	-webkit-filter: blur(0.7px) brightness(1.1) contrast(1.1) opacity(1);
-	-moz-filter: blur(15px);
+	-moz-filter: blur(0.7px);
 	filter: progid:DXImageTransform.Microsoft.Blur(PixelRadius=10, MakeShadow=false); /* IE6~IE9 */
 }
 .music_core_content {

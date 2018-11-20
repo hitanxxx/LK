@@ -822,11 +822,13 @@ static status tunnel_remote_init ( event_t * ev )
 	the getaddrinfo is not a good solution to resolve domain name
 	it should use dns analysis
 	*/
+	debug_log("%s --- before get addr", __func__ );
 	if( OK != tunnel_remote_get_addr( t ) ) {
 		err_log( "%s --- tunnel addr ip", __func__ );
 		tunnel_over( t );
 		return ERROR;
 	}
+	debug_log("%s --- after get addr", __func__ );
 	downstream->read->handler = NULL;
 	downstream->write->handler = NULL;
 
