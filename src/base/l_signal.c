@@ -3,6 +3,7 @@
 int32			global_signal = 0;
 sig_atomic_t	sig_quit = 0;
 sig_atomic_t	sig_reap = 0;
+sig_atomic_t	sig_reload = 0;
 sig_atomic_t 	sig_perf = 0;
 sig_atomic_t	sig_perf_stop = 0;
 
@@ -54,10 +55,12 @@ static void l_signal_handler( int32 lsignal )
 	errno_cache = errno;
 	global_signal = lsignal;
 	if( process_id == 0xffff ) {
-		if( lsignal == SIGINT || lsignal == SIGHUP ) {
+		if( lsignal == SIGINT ) {
 			sig_quit = 1;
 		} else if ( lsignal == SIGCHLD ) {
 			sig_reap = 1;
+		} else if ( lsignal == SIGHUP ) {
+			sig_reload = 1;
 		}
 	} else {
 		if( lsignal == SIGINT ) {
@@ -76,6 +79,32 @@ static void l_signal_handler( int32 lsignal )
 	}
 	errno = errno_cache;
 	return;
+}
+// l_signal_self -----------
+status l_signal_self( int32 lsignal )
+{
+	int32 fd, pid;
+	char str[128] = {0};
+
+	fd = open( L_PATH_PIDFILE, O_RDONLY );
+	if( ERROR == fd ) {
+		err_log( "%s --- open pid file", __func__ );
+		return ERROR;
+	}
+	if( ERROR == read( fd, str, sizeof(str) ) ) {
+		err_log("%s --- read pid file", __func__ );
+		close( fd );
+		return ERROR;
+	}
+	if( OK != l_atoi( str, l_strlen(str), &pid ) ) {
+		err_log("%s --- atoi pid file value [%s]", __func__, str );
+		return ERROR;
+	}
+	if( ERROR == kill( pid, lsignal ) ) {
+		err_log( "%s --- kill signal to pidfile, [%d]", __func__, errno );
+		return ERROR;
+	}
+	return OK;
 }
 // l_signal_init --------------------
 status l_signal_init( void )

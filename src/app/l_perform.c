@@ -4,20 +4,8 @@ static queue_t 				in_use;
 static queue_t 				usable;
 static perform_t*			pool = NULL;
 static perform_setting_t 	perf_settings;
-
 static l_atomic_t single_process_count_arr[PERFORM_MAX_PIPE] = {0};
-// share memory for perf module count data
-l_atomic_t	*	perform_success;
-l_atomic_t	*	perform_failed;
-l_atomic_t	*	perform_recvs;
-l_atomic_t	*	perform_sends;
-
-l_atomic_t	*	perform_200;
-l_atomic_t	*	perform_1xx;
-l_atomic_t	*	perform_2xx;
-l_atomic_t	*	perform_3xx;
-l_atomic_t	*	perform_4xx;
-l_atomic_t	*	perform_5xx;
+static perform_count_t		perf_count;
 
 static uint32	shm_length = 0;
 static char * 	shm_ptr = NULL;
@@ -171,19 +159,19 @@ static status perf_over( perform_t * p, status rc )
 		// if we got a complate response, but it's not 200 response status.
 		// we still think that it's success
 		debug_log(  "%s --- perform over, OK", __func__ );
-		performance_count_change( &perform_success[p->pipeline_index], 1 );
+		performance_count_change( &perf_count.perform_success[p->pipeline_index], 1 );
 		if( RES_CODE(p) == 200 ) {
-			performance_count_change( &perform_200[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_200[p->pipeline_index], 1 );
 		} else if ( 100 <= RES_CODE(p) && RES_CODE(p) < 200 ) {
-			performance_count_change( &perform_1xx[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_1xx[p->pipeline_index], 1 );
 		} else if ( 200 <  RES_CODE(p) && RES_CODE(p) < 300 ) {
-			performance_count_change( &perform_2xx[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_2xx[p->pipeline_index], 1 );
 		} else if ( 300 <= RES_CODE(p) && RES_CODE(p) < 400 ) {
-			performance_count_change( &perform_3xx[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_3xx[p->pipeline_index], 1 );
 		} else if ( 400 <= RES_CODE(p) && RES_CODE(p) < 500 ) {
-			performance_count_change( &perform_4xx[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_4xx[p->pipeline_index], 1 );
 		} else if ( 500 <= RES_CODE(p) && RES_CODE(p) < 600 ) {
-			performance_count_change( &perform_5xx[p->pipeline_index], 1 );
+			performance_count_change( &perf_count.perform_5xx[p->pipeline_index], 1 );
 		}
 		// if keep alive on, don't l_safe_free the connection, set a keepalive timer
 		if( p->response_head->keepalive && perf_settings.keepalive ) {
@@ -205,7 +193,7 @@ static status perf_over( perform_t * p, status rc )
 		return perf_go( p );
 	} else if ( rc == ERROR ) {
 		// got a error, change flag, continue
-		performance_count_change( &perform_failed[p->pipeline_index], 1 );
+		performance_count_change( &perf_count.perform_failed[p->pipeline_index], 1 );
 		perf_close_connection( c );
 		perf_close_perform( p );
 
@@ -235,10 +223,10 @@ static status perf_recv_body( event_t * ev )
 		timer_del( &c->read->timer );
 		debug_log(  "%s --- success", __func__ );
 		if( p->response_body->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			performance_count_change( &perform_recvs[p->pipeline_index],
+			performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
 			 	p->response_body->content_length );
 		} else if( p->response_body->body_type == HTTP_ENTITYBODY_CHUNK ) {
-			performance_count_change( &perform_recvs[p->pipeline_index],
+			performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
 			 	p->response_body->chunk_all_length );
 		}
 		return perf_over( p, OK );
@@ -265,7 +253,7 @@ static status perf_recv_header ( event_t * ev )
 	} else if( rc == DONE ) {
 		timer_del( &c->read->timer );
 		debug_log(  "%s --- success", __func__ );
-		performance_count_change( &perform_recvs[p->pipeline_index],
+		performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
 		 	meta_len( p->response_head->head.pos, p->response_head->head.last) );
 
 		// have't any response body
@@ -306,7 +294,8 @@ static status perf_send( event_t * ev )
 	} else if ( rc == DONE ) {
 		timer_del( &c->write->timer );
 		debug_log(  "%s --- success", __func__ );
-		performance_count_change( &perform_sends[p->pipeline_index], p->send_n );
+		performance_count_change( &perf_count.perform_sends[p->pipeline_index],
+	 	p->send_n );
 
 		if( OK != http_response_head_create( c, &p->response_head ) ) {
 			err_log(  "%s --- http_response_head_create", __func__ );
@@ -718,7 +707,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_success[i-1];
+			vv->num = perf_count.perform_success[i-1];
 			// failed
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -727,7 +716,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_failed[i-1];
+			vv->num = perf_count.perform_failed[i-1];
 			// send
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -736,7 +725,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_sends[i-1];
+			vv->num = perf_count.perform_sends[i-1];
 			// recv
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -745,7 +734,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_recvs[i-1];
+			vv->num = perf_count.perform_recvs[i-1];
 			// 200
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -754,7 +743,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_200[i-1];
+			vv->num = perf_count.perform_200[i-1];
 			// 1xx
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -763,7 +752,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_1xx[i-1];
+			vv->num = perf_count.perform_1xx[i-1];
 			// 2xx
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -772,7 +761,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_2xx[i-1];
+			vv->num = perf_count.perform_2xx[i-1];
 			// 3xx
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -781,7 +770,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_3xx[i-1];
+			vv->num = perf_count.perform_3xx[i-1];
 			// 4xx
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -790,7 +779,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_4xx[i-1];
+			vv->num = perf_count.perform_4xx[i-1];
 			// 5xx
 			v = mem_list_push( obj->list );
 			v->type = JSON_STR;
@@ -799,7 +788,7 @@ status performance_count_output( json_t ** data )
 			mem_list_create( &v->list, sizeof(json_t) );
 			vv = mem_list_push( v->list );
 			vv->type = JSON_NUM;
-			vv->num = perform_5xx[i-1];
+			vv->num = perf_count.perform_5xx[i-1];
 		}
 	}
 	*data = json;
@@ -811,17 +800,17 @@ static status performance_count_init( void )
 	uint32 i;
 	// clear share memory count data
 	for( i = 0; i < PERFORM_MAX_PIPE; i ++ ) {
-		performance_count_change( &perform_success[i], 0 );
-		performance_count_change( &perform_failed[i], 0 );
-		performance_count_change( &perform_sends[i], 0 );
-		performance_count_change( &perform_recvs[i], 0 );
+		performance_count_change( &perf_count.perform_success[i], 0 );
+		performance_count_change( &perf_count.perform_failed[i], 0 );
+		performance_count_change( &perf_count.perform_sends[i], 0 );
+		performance_count_change( &perf_count.perform_recvs[i], 0 );
 
-		performance_count_change( &perform_200[i], 0 );
-		performance_count_change( &perform_1xx[i], 0 );
-		performance_count_change( &perform_2xx[i], 0 );
-		performance_count_change( &perform_3xx[i], 0 );
-		performance_count_change( &perform_4xx[i], 0 );
-		performance_count_change( &perform_5xx[i], 0 );
+		performance_count_change( &perf_count.perform_200[i], 0 );
+		performance_count_change( &perf_count.perform_1xx[i], 0 );
+		performance_count_change( &perf_count.perform_2xx[i], 0 );
+		performance_count_change( &perf_count.perform_3xx[i], 0 );
+		performance_count_change( &perf_count.perform_4xx[i], 0 );
+		performance_count_change( &perf_count.perform_5xx[i], 0 );
 	}
 	performance_setting_end( );
 	return OK;
@@ -948,7 +937,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->ip.len = ip.len;
 		pipeline->ip.data = l_mem_alloc( pipeline->page, pipeline->ip.len );
 		if( !pipeline->ip.data ) {
-			err_log("%s --- l_safe_malloc ip data", __func__ );
+			err_log("%s --- mem alloc ip data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->ip.data, ip.data, ip.len );
@@ -962,7 +951,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->host.len = host.len;
 		pipeline->host.data = l_mem_alloc( pipeline->page, pipeline->host.len );
 		if( !pipeline->host.data ) {
-			err_log(  "%s --- l_safe_malloc host data", __func__ );
+			err_log(  "%s --- mem alloc host data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->host.data, host.data, host.len );
@@ -970,7 +959,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->method.len = method.len;
 		pipeline->method.data = l_mem_alloc( pipeline->page, pipeline->method.len );
 		if( !pipeline->method.data ) {
-			err_log(  "%s --- l_safe_malloc method data", __func__ );
+			err_log(  "%s --- mem alloc method data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->method.data, method.data, method.len );
@@ -978,7 +967,7 @@ static status performance_setting_init( json_t * json )
 		pipeline->uri.len = uri.len;
 		pipeline->uri.data = l_mem_alloc( pipeline->page, pipeline->uri.len );
 		if( !pipeline->uri.data ) {
-			err_log(  "%s --- l_safe_malloc uri data", __func__ );
+			err_log(  "%s --- mem alloc uri data", __func__ );
 			return ERROR;
 		}
 		memcpy( pipeline->uri.data, uri.data, uri.len );
@@ -1000,7 +989,7 @@ static status performance_setting_init( json_t * json )
 			pipeline->body.len = v->name.len;
 			pipeline->body.data = l_mem_alloc( pipeline->page, pipeline->body.len );
 			if( !pipeline->body.data ) {
-				err_log(  "%s --- l_safe_malloc body data", __func__ );
+				err_log(  "%s --- mem alloc body data", __func__ );
 				return ERROR;
 			}
 			memcpy( pipeline->body.data, v->name.data, v->name.len );
@@ -1135,16 +1124,16 @@ status perform_init( void )
 		return OK;
 	}
 	if( conf.worker_process <= 1 ) {
-		perform_success = &single_process_count_arr[0];
-		perform_failed = &single_process_count_arr[1];
-		perform_sends = &single_process_count_arr[2];
-		perform_recvs = &single_process_count_arr[3];
-		perform_200 = &single_process_count_arr[4];
-		perform_1xx = &single_process_count_arr[5];
-		perform_2xx = &single_process_count_arr[6];
-		perform_3xx = &single_process_count_arr[7];
-		perform_4xx = &single_process_count_arr[8];
-		perform_5xx = &single_process_count_arr[9];
+		perf_count.perform_success = &single_process_count_arr[0];
+		perf_count.perform_failed = &single_process_count_arr[1];
+		perf_count.perform_sends = &single_process_count_arr[2];
+		perf_count.perform_recvs = &single_process_count_arr[3];
+		perf_count.perform_200 = &single_process_count_arr[4];
+		perf_count.perform_1xx = &single_process_count_arr[5];
+		perf_count.perform_2xx = &single_process_count_arr[6];
+		perf_count.perform_3xx = &single_process_count_arr[7];
+		perf_count.perform_4xx = &single_process_count_arr[8];
+		perf_count.perform_5xx = &single_process_count_arr[9];
 		return OK;
 	}
 	shm_length += (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );
@@ -1153,25 +1142,25 @@ status perform_init( void )
 		err_log("%s --- mmap shm failed, [%d]", __func__, errno );
 		return ERROR;
 	}
-	perform_success = (l_atomic_t*)( shm_ptr );
-	perform_failed = (l_atomic_t*)
-			( perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_recvs = (l_atomic_t*)
-			( perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_sends = (l_atomic_t*)
-			( perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_200 = (l_atomic_t*)
-			( perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_1xx = (l_atomic_t*)
-			( perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_2xx = (l_atomic_t*)
-			( perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_3xx = (l_atomic_t*)
-			( perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_4xx = (l_atomic_t*)
-			( perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perform_5xx = (l_atomic_t*)
-			( perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_success = (l_atomic_t*)( shm_ptr );
+	perf_count.perform_failed = (l_atomic_t*)
+			( perf_count.perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_recvs = (l_atomic_t*)
+			( perf_count.perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_sends = (l_atomic_t*)
+			( perf_count.perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_200 = (l_atomic_t*)
+			( perf_count.perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_1xx = (l_atomic_t*)
+			( perf_count.perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_2xx = (l_atomic_t*)
+			( perf_count.perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_3xx = (l_atomic_t*)
+			( perf_count.perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_4xx = (l_atomic_t*)
+			( perf_count.perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_5xx = (l_atomic_t*)
+			( perf_count.perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
 	return OK;
 }
 // perform_end --------------

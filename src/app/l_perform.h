@@ -15,6 +15,20 @@ typedef struct perform_setting_t {
 	mem_list_t *	list_pipeline;
 } perform_setting_t;
 
+typedef struct perform_count_t {
+	l_atomic_t	*	perform_success;
+	l_atomic_t	*	perform_failed;
+	l_atomic_t	*	perform_recvs;
+	l_atomic_t	*	perform_sends;
+
+	l_atomic_t	*	perform_200;
+	l_atomic_t	*	perform_1xx;
+	l_atomic_t	*	perform_2xx;
+	l_atomic_t	*	perform_3xx;
+	l_atomic_t	*	perform_4xx;
+	l_atomic_t	*	perform_5xx;
+} perform_count_t;
+
 typedef struct perform_pipeline_t {
 	l_mem_page_t *		page;
 	struct sockaddr_in 	addr;

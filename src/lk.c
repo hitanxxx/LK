@@ -1,6 +1,7 @@
 #include "lk.h"
 
 static char * l_process_signal = NULL;
+static int32  l_process_signal_type = 0;
 
 static module_init_pt static_modules[] = {
 	log_init,
@@ -156,25 +157,8 @@ static status modules_end(  )
 // do_option -------------
 static status do_option(  )
 {
-	int32 fd, pid;
-	char str[128] = {0};
-
-	fd = open( L_PATH_PIDFILE, O_RDONLY );
-	if( ERROR == fd ) {
-		err_log( "open pid file" );
-		return ERROR;
-	}
-	if( ERROR == read( fd, str, sizeof(str) ) ) {
-		err_log("read pid file" );
-		close( fd );
-		return ERROR;
-	}
-	if( OK != l_atoi( str, l_strlen(str), &pid ) ) {
-		err_log("atoi pid file value [%s]", str );
-		return ERROR;
-	}
-	if( ERROR == kill( pid, SIGINT ) ) {
-		err_log( "kill signal to pidfile, [%d]", errno );
+	if( OK != l_signal_self( l_process_signal_type ) ) {
+		err_log("%s --- signal to self failed", __func__ );
 		return ERROR;
 	}
 	return OK;
@@ -190,12 +174,15 @@ static status get_option( int argc, char * argv[] )
 		return ERROR;
 	}
 	l_process_signal = argv[1];
-	if( *l_process_signal != '-' ) {
+	if( *l_process_signal++ != '-' ) {
 		err_log("invaild parameter" );
 		return ERROR;
 	}
-	l_process_signal++;
-	if( strcmp( l_process_signal, "stop" ) == 0 ) {
+	if ( strcmp( l_process_signal, "reload" ) == 0 ) {
+		l_process_signal_type = 1;
+		return OK;
+	} else if( strcmp( l_process_signal, "stop" ) == 0 ) {
+		l_process_signal_type = 2;
 		return OK;
 	}
 	err_log("invaild parameter" );

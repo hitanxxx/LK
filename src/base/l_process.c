@@ -146,6 +146,11 @@ void process_master_run( void )
 			process_broadcast_child( SIGINT );
 			continue;
 		}
+		if( sig_reload ) {
+			sig_reload = 0;
+			process_broadcast_child( SIGINT );
+			continue;
+		}
 	}
 }
 // process_single_run ---------------

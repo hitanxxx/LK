@@ -1,9 +1,13 @@
 #include "lk.h"
 
+static status api_web_response_success( webser_t * webser );
+static status api_web_response_failed( webser_t * webser, char * str, uint32 length );
+
 static status api_perform_info( void * data );
 static status api_perform_start( void * data );
 static status api_perform_stop( void * data );
 static status api_proxy( void * data );
+static status api_tunnel_setting( void * data );
 
 // ---------
 static serv_api_t api_arr_web[] = {
@@ -11,60 +15,19 @@ static serv_api_t api_arr_web[] = {
 	{ string("/perform_start"),			api_perform_start },
 	{ string("/perform_stop"),			api_perform_stop },
 	{ string("/proxy"),					api_proxy 		},
+	{ string("/tunnel_set"),			api_tunnel_setting },
 	{ string_null,						NULL			}
 };
 
-// api_web_response_success ----
-static status api_web_response_success( webser_t * webser )
+// api_tunnel_setting -------------
+status api_tunnel_setting( void * data )
 {
-	/*
-	{ "status":"success" }
-	*/
-	string_t str = string("{\"status\":\"success\"}");
-	meta_t * t;
+	webser_t  * webser;
+	json_t * json;
+	status rc;
 
-	meta_alloc( &t, str.len );
-	memcpy( t->last, str.data, str.len );
-	t->last += str.len;
-
-	webser_set_mimetype( webser, ".json", l_strlen(".json") );
-	webser->re_status = 200;
-	webser->filesize = str.len;
-	webser_entity_head( webser );
-	webser->response_body = t;
-
-	return webser_response( webser->c->write );
-}
-// api_web_response_failed ----
-static status api_web_response_failed( webser_t * webser, char * str, uint32 length )
-{
-	/*
-	{"status":"error","resson":"xxx"}
-	*/
-	string_t str_head = string("{\"status\":\"error\",\"reason\":\"");
-	string_t str_tail = string("\"}");
-	meta_t * t;
-	uint32 all_length;
-
-	all_length = length + str_head.len + str_tail.len;
-	meta_alloc( &t, all_length );
-
-	memcpy( t->last, str_head.data, str_head.len );
-	t->last += str_head.len;
-
-	memcpy( t->last, str, length );
-	t->last += length;
-
-	memcpy( t->last, str_tail.data, str_tail.len );
-	t->last += str_tail.len;
-
-	webser_set_mimetype( webser, ".json", l_strlen(".json") );
-	webser->re_status = 200;
-	webser->filesize = all_length;
-	webser_entity_head( webser );
-	webser->response_body = t;
-
-	return webser_response( webser->c->write );
+	webser = data;
+	return OK;
 }
 // api_proxy -------------------------------
 status api_proxy( void * data )
@@ -368,6 +331,58 @@ status api_perform_stop( void * data )
 		}
 	}
 	return api_web_response_success( webser );
+}
+// api_web_response_success ----
+static status api_web_response_success( webser_t * webser )
+{
+	/*
+	{ "status":"success" }
+	*/
+	string_t str = string("{\"status\":\"success\"}");
+	meta_t * t;
+
+	meta_alloc( &t, str.len );
+	memcpy( t->last, str.data, str.len );
+	t->last += str.len;
+
+	webser_set_mimetype( webser, ".json", l_strlen(".json") );
+	webser->re_status = 200;
+	webser->filesize = str.len;
+	webser_entity_head( webser );
+	webser->response_body = t;
+
+	return webser_response( webser->c->write );
+}
+// api_web_response_failed ----
+static status api_web_response_failed( webser_t * webser, char * str, uint32 length )
+{
+	/*
+	{"status":"error","resson":"xxx"}
+	*/
+	string_t str_head = string("{\"status\":\"error\",\"reason\":\"");
+	string_t str_tail = string("\"}");
+	meta_t * t;
+	uint32 all_length;
+
+	all_length = length + str_head.len + str_tail.len;
+	meta_alloc( &t, all_length );
+
+	memcpy( t->last, str_head.data, str_head.len );
+	t->last += str_head.len;
+
+	memcpy( t->last, str, length );
+	t->last += length;
+
+	memcpy( t->last, str_tail.data, str_tail.len );
+	t->last += str_tail.len;
+
+	webser_set_mimetype( webser, ".json", l_strlen(".json") );
+	webser->re_status = 200;
+	webser->filesize = all_length;
+	webser_entity_head( webser );
+	webser->response_body = t;
+
+	return webser_response( webser->c->write );
 }
 // webapi_init -----------
 status webapi_init( void )
