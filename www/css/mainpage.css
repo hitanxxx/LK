@@ -31,7 +31,7 @@ audio {
 }
 .glodec {
 	background-attachment:fixed;
-	background: url(https://i.loli.net/2018/11/03/5bddc50cb1ccf.jpg) center;
+	background: url(https://i.loli.net/2018/11/20/5bf36a450e5ff.jpg) center;
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -168,7 +168,7 @@ animation-play-state: running;
 	margin: 0px -130px;
 	text-align: center;
 	top: 350px;
-	color:black ;
+	color:#d0d0d0 ;
 }
 
 .footer {
@@ -177,12 +177,12 @@ animation-play-state: running;
 	font-size:13px;
 	width:100%;
 	bottom:0px;
-    color: #272727;
+    color: #d0d0d0;
 }
 .footer a:link {
 	text-decoration:none;
 	color:black;
 }
 .footer a:hover {
-	color:#FF708C;
+	color:pink;
 }
