@@ -955,12 +955,14 @@ static status tunnel_local_start ( event_t * ev )
 		downstream->read->handler = tunnel_remote_init;
 	} else if( conf.tunnel_mode == TUNNEL_SERVER ||
 	conf.tunnel_mode == TUNNEL_SINGLE ) {
+
 		if( OK != http_request_head_create( downstream, &t->request_head ) ) {
 			err_log( "%s --- request alloc", __func__ );
 			tunnel_over( t );
 			return ERROR;
 		}
 		downstream->read->handler = tunnel_local_process_request;
+		
 	}
 	event_opt( downstream->read, EVENT_READ );
 	return downstream->read->handler( downstream->read );
@@ -1048,7 +1050,7 @@ status tunnel_init( void )
 {
 	if( conf.tunnel_mode == TUNNEL_CLIENT ||
 		conf.tunnel_mode == TUNNEL_SINGLE ) {
-		listen_add( 7325, tunnel_local_init, HTTP );
+		listen_add( 7325, tunnel_local_init, TCP );
 	} else if ( conf.tunnel_mode == TUNNEL_SERVER ) {
 		listen_add( 7324, tunnel_local_init, HTTPS );
 	}

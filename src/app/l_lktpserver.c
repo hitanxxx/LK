@@ -226,11 +226,10 @@ static status lktpserv_api_find( event_t * ev )
 	debug_log("%s --- find api: [%.*s], goto api function", __func__, lktp->lktp_head->api.len, lktp->lktp_head->api.data );
     if( OK == serv_api_find( &lktp->lktp_head->api, &lktp->handler ) ) {
 		if( conf.lktp_mode == LKTP_CLIENT ) {
-			// timer_del( &lktp->timer_message );
-			// add timer for next send heartbeat
+			// wait LKTP_TIMEOUT_HEARTBEAT second, send next heartbeat
 		    lktp->timer_message.data = (void*)lktp;
 		    lktp->timer_message.handler = lktpserv_client_send_heartbeat;
-		    timer_add( &lktp->timer_message, LKTP_TIMEOUT );
+		    timer_add( &lktp->timer_message, LKTP_TIMEOUT_HEARTBEAT );
 		}
         return lktpserv_api_do( c->write );
     } else {

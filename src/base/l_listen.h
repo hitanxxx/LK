@@ -1,6 +1,7 @@
 #ifndef _L_LISTEN_H_INCLUDED_
 #define _L_LISTEN_H_INCLUDED_
 
+#define TCP		 0x0009
 #define HTTP	 0x1000
 #define HTTPS	 0x1001
 #define LKTP	 0x1002

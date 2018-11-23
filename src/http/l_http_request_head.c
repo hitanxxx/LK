@@ -79,6 +79,7 @@ static status http_request_head_recv( connection_t * c, meta_t * meta )
 		debug_log("%s --- again", __func__ );
 		return AGAIN;
 	} else {
+		debug_log("%s --- recvd length [%d]", __func__, rc );
 		meta->last += rc;
 		return OK;
 	}
@@ -462,7 +463,7 @@ static status http_request_head_process_headers( http_request_head_t * request )
 			inet_ntoa( request->c->addr.sin_addr ),
 			user_agent.len,
 		 	user_agent.data );
-			
+
 			if( request->headers_in.content_length ) {
 				request->body_type = HTTP_ENTITYBODY_CONTENT;
 				if( OK != l_atoi( request->headers_in.content_length->data,
