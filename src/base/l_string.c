@@ -1,5 +1,17 @@
 #include "lk.h"
 
+char * l_strncpy( char * dst, uint32 dst_len, char * src, uint32 src_len )
+{
+	if( dst_len < src_len ) return NULL;
+
+	while( dst_len && src_len ) {
+		*dst++ = *src++;
+		dst_len --;
+		src_len --;
+	}
+	return dst;
+}
+
 // l_pow ------
 static uint32 l_pow( uint32 x, uint32 pow )
 {

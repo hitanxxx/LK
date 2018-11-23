@@ -58,11 +58,14 @@ reload all worker process
 	},
 	"perf":{
 		"switch":false
+	},
+	"lktp":{
+		"mode":"server"
 	}
 
 }
 ```
-一个典型的配置文件如上，结构划分为三个部分：
+一个典型的配置文件如上，结构划分为多个部分：
 the configuration file can be divided into three part:
 * 全局块，一般设置一些共享的信息。
 > * daemon - 守护进程开关
@@ -85,6 +88,8 @@ the configuration file can be divided into three part:
 > * serverip - 当mode为client的时候需要额外指定serverip。
 * perf 块，指定性能测试模块的信息。
 > * switch - 是否开启性能测试模块。如果开启。将只有最后一个启动的工作进程监听。其余工作监听不监听，只用来性能测试。
+* lktp 块，关于lktp通信的相关设置。
+> * mode - lktp运行的模式，server模式开启5555端口，client模式需要指定serverip字段说明lktp server的ip地址。lktp使用tcp长连接。
 # Tips
 * 通过 /perform.html进入web应用性能测试的UI页面。
 * tunnel模块使用的端口为7324，7325。client/proxy使用7325。server使用7324。暂不能通过配置修改。

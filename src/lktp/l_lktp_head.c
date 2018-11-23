@@ -97,6 +97,7 @@ static status lktp_head_parse_head( lktp_head_t * lktp_head, meta_t * meta )
             }
         }
         if( state == lktp_head_body_length_start ) {
+            // body length must have one char at least
             if( ( '0' <= *p && *p <= '9' ) ) {
                 lktp_head->body_length.data = p;
                 state = lktp_head_body_length;

@@ -3,6 +3,7 @@
 
 #define HTTP	 0x1000
 #define HTTPS	 0x1001
+#define LKTP	 0x1002
 
 extern mem_list_t * listens;
 //listen
@@ -12,12 +13,12 @@ typedef struct listen_t {
 	uint32 				port;
 	uint32				type;
 	listen_pt			handler;
-	
+
 	int32				fd;
 	struct sockaddr_in  server_addr;
 	connection_t 		* c;
 	mem_list_t			*list;
-	
+
 	uint32				error;
 	uint32 				reuse_port;
 } listen_t;

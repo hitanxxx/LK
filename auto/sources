@@ -36,9 +36,11 @@ src/http/l_http_response_head.h \
 src/http/l_http_request_head.h \
 src/lktp/l_lktp_head.h \
 src/lktp/l_lktp_body.h \
+src/lktp/l_lktp_request.h \
 src/app/l_perform.h \
 src/app/l_tunnel.h \
 src/app/l_webserver.h \
+src/app/l_lktpserver.h \
 src/apis/l_webapi.h \
 src/util/l_list.h \
 src/util/l_queue.h \
@@ -75,9 +77,11 @@ src/http/l_http_response_head.c \
 src/http/l_http_request_head.c \
 src/lktp/l_lktp_head.c \
 src/lktp/l_lktp_body.c \
+src/lktp/l_lktp_request.c \
 src/app/l_perform.c \
 src/app/l_tunnel.c \
 src/app/l_webserver.c \
+src/app/l_lktpserver.c \
 src/apis/l_webapi.c \
 \
 src/test/l_ts_mem.c \

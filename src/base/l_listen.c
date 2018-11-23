@@ -7,10 +7,10 @@ status listen_add( uint32 port, listen_pt handler, uint32 type )
 {
 	listen_t *  listen;
 
-	if( type != HTTP && type != HTTPS ) {
-		err_log("%s --- not support listen type", __func__ );
-		return ERROR;
-	}
+	// if( type != HTTP && type != HTTPS ) {
+	// 	err_log("%s --- not support listen type", __func__ );
+	// 	return ERROR;
+	// }
 	listen = mem_list_push( listens );
 	if( !listen ) {
 		err_log( "%s --- list push", __func__ );

@@ -210,6 +210,39 @@ static status config_parse_perf( json_t * json )
 	}
 	return OK;
 }
+// config_parse_lktp --------
+static status config_parse_lktp( json_t * json )
+{
+	json_t * root_obj, *lktp_obj, *v;
+	status rc;
+
+	json_get_child( json, 1, &root_obj );
+
+	if( OK == json_get_obj_obj(root_obj, "lktp", l_strlen("lktp"), &lktp_obj ) ) {
+		rc = json_get_obj_str(lktp_obj, "mode", l_strlen("mode"), &v );
+		if( rc == ERROR ) {
+			err_log("%s --- lktp need specify a valid 'mode'", __func__ );
+			return ERROR;
+		}
+		if( v->name.len == l_strlen("xxxxxx") ) {
+			if( strncmp( v->name.data, "server", l_strlen("server") ) == 0  ) {
+				conf.lktp_mode = LKTP_SERVER;
+			} else if ( strncmp( v->name.data, "client", l_strlen("client") ) == 0 ) {
+				conf.lktp_mode = LKTP_CLIENT;
+				if( OK != json_get_obj_str(lktp_obj, "serverip", l_strlen("serverip"), &v ) ) {
+					err_log("%s --- lktp client need specify server ip", __func__ );
+					return ERROR;
+				}
+				conf.lktp_serverip.data = v->name.data;
+				conf.lktp_serverip.len = v->name.len;
+			} else {
+				err_log("%s --- not support lktp mode, [%.*s]", __func__, v->name.len, v->name.data );
+				return ERROR;
+			}
+		}
+	}
+	return OK;
+}
 // config_parse -----
 static status config_parse( json_t * json )
 {
@@ -227,6 +260,10 @@ static status config_parse( json_t * json )
 	}
 	if( OK != config_parse_perf( json ) ) {
 		err_log( "%s --- parse perf", __func__ );
+		return ERROR;
+	}
+	if( OK != config_parse_lktp( json ) ) {
+		err_log( "%s --- parse lktp", __func__ );
 		return ERROR;
 	}
 	return OK;

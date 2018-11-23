@@ -30,6 +30,9 @@ typedef struct config_t
 	string_t	serverip;
 	// perf
 	uint32  	perf_switch;
+	// lktp
+	uint32		lktp_mode;
+	string_t 	lktp_serverip;
 }config_t;
 
 extern config_t conf;

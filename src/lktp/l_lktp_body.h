@@ -8,11 +8,11 @@ struct lktp_body_t {
     queue_t             queue;
     connection_t *      c;
     lktp_body_handler   handler;
-    
+
     uint32      cache;
 
     uint32      body_length;
-    ssize_t      body_need;
+    ssize_t     body_need;
 
     meta_t *    body_head;
     meta_t *    body_last;

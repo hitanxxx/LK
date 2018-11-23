@@ -20,7 +20,29 @@ status meta_file_alloc( meta_t ** meta, uint32 length )
 	*meta = new;
 	return OK;
 }
+status meta_page_alloc( l_mem_page_t * page, meta_t ** out, uint32 size )
+{
+	meta_t * new = NULL;
 
+	new = (meta_t*)l_mem_alloc( page, sizeof(meta_t) );
+	if( !new ) {
+		return ERROR;
+	}
+	memset( new, 0, sizeof(meta_t) );
+	new->data = NULL;
+	new->next = NULL;
+
+	new->data = (char*)l_mem_alloc( page, size*sizeof(char) );
+	if( !new->data ) {
+		return ERROR;
+	}
+	memset( new->data, 0, size*sizeof(char) );
+	new->start = new->pos = new->last = new->data;
+	new->end = new->start + size*sizeof(char);
+
+	*out = new;
+	return OK;
+}
 // meta_alloc --------------
 status meta_alloc( meta_t ** meta, uint32 size )
 {

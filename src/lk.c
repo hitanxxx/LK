@@ -16,6 +16,8 @@ static module_init_pt static_modules[] = {
 	perform_init,
 	serv_init,
 	webapi_init,
+	timer_init,
+	lktpserv_init,
 	NULL
 };
 
@@ -23,7 +25,6 @@ static module_init_pt static_modules[] = {
 status dynamic_module_init( void )
 {
 	net_init();
-	timer_init(),
 	event_process_init();
 	http_response_head_init_module();
 	http_request_head_init_module();
@@ -39,7 +40,6 @@ status dynamic_module_init( void )
 status dynamic_module_end( void )
 {
 	net_end();
-	timer_end( );
 	event_process_end( );
 	http_response_head_end_module();
 	http_request_head_end_module();
