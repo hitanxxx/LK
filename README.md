@@ -79,8 +79,8 @@ the configuration file can be divided into three part:
 > * accept_mutex - 信号量锁开关。
 > * log_error - error日志开关。
 > * log_debug - debug日志开关。（影响性能）
-> * sslcrt - ssl证书文件。
-> * sslkey - ssl证书文件。
+> * sslcrt - SSL证书&公钥。
+> * sslkey - SSL私钥。
 * http 块，设置一些关于http的信息。
 > * access_log - http模块access日志
 > * keepalive - http长连接支持开关。
