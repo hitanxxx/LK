@@ -9,7 +9,7 @@ UI用echarts js实现初略的数据可视化。通过UI可以方便的设置测
 lk-tunnel SSL tunnel(翻墙模式)/http|https proxy。</br>
 双向SSL加密。安全性高。信息只能在ip层面进行跟踪。应用流量只能阻隔，无法篡改，跟踪。</br>
 性能高，占用资源极少。适合各种低性能的硬件环境。</br>
-跑在1G DDR2 ram的树莓派上，看一个720p的视频，cpu与内存的使用率维持在2%。一个有意思的用法是搭配lk-perf来使用，佐以大量的假请求。混淆真实请求。
+跑在1G DDR2 ram的树莓派上，看一个720p的视频，cpu与内存的使用率维持在2%。
 ## LK-WEB
 lk-web 一个小巧简单的web服务器，支持部分http特征。</br>
 简单的路由提供webservice。以及静态文件服务。
