@@ -914,7 +914,12 @@ static status tunnel_local_process_request( event_t * ev )
 		timer_del( &downstream->read->timer );
 		if( t->request_head->method.len == l_strlen("CONNECT") ) {
 			if( strncmp( t->request_head->method.data, "CONNECT",
-			 l_strlen("CONNECT") ) == 0 ){
+			 l_strlen("CONNECT") ) == 0 ) {
+				if( t->downstream->meta->pos != t->downstream->meta->last ) {
+					err_log("%s --- connect have body", __func__ );
+					tunnel_over( t );
+					return ERROR;
+				}
 				t->https = 1;
 			}
 		}
@@ -924,7 +929,6 @@ static status tunnel_local_process_request( event_t * ev )
 	downstream->read->timer.data = (void*)t;
 	downstream->read->timer.handler = tunnel_time_out;
 	timer_add( &downstream->read->timer, TUNNEL_TIMEOUT );
-	debug_log("%s --- again", __func__ );
 	return AGAIN;
 }
 // tunnel_local_start ---------
@@ -962,7 +966,7 @@ static status tunnel_local_start ( event_t * ev )
 			return ERROR;
 		}
 		downstream->read->handler = tunnel_local_process_request;
-		
+
 	}
 	event_opt( downstream->read, EVENT_READ );
 	return downstream->read->handler( downstream->read );
