@@ -34,6 +34,8 @@ struct http_entitybody_t {
 	// data chain
 	meta_t * 			body_head;
 	meta_t *			body_last;
+
+	uint32				all_length;
 };
 
 status http_entitybody_create( connection_t * c, http_entitybody_t ** body );

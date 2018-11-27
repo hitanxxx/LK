@@ -8,6 +8,7 @@ static status api_perform_start( void * data );
 static status api_perform_stop( void * data );
 static status api_proxy( void * data );
 static status api_tunnel_setting( void * data );
+status api_file_upload( void * data );
 
 // ---------
 static serv_api_t api_arr_web[] = {
@@ -16,8 +17,26 @@ static serv_api_t api_arr_web[] = {
 	{ string("/perform_stop"),			api_perform_stop },
 	{ string("/proxy"),					api_proxy 		},
 	{ string("/tunnel_set"),			api_tunnel_setting },
+	{ string("/file_upload"),			api_file_upload },
 	{ string_null,						NULL			}
 };
+// api_file_upload ------
+status api_file_upload( void * data )
+{
+	webser_t * webser;
+	meta_t file;
+	status rc;
+	int32 ffd;
+
+	webser = data;
+	// upload limit 1m
+	if( webser->request_body->all_length > 1024*1024 ) {
+		return api_web_response_failed( webser,
+			"file size limit 1m",
+			l_strlen("file size limit 1m") );
+	}
+	return OK;
+}
 
 // api_tunnel_setting -------------
 status api_tunnel_setting( void * data )

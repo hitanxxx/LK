@@ -223,6 +223,11 @@ static status http_entitybody_process( http_entitybody_t * bd )
 			return ERROR;
 		} else if ( rc == DONE ) {
 			debug_log("%s --- success", __func__ );
+			if( bd->body_type == HTTP_ENTITYBODY_CONTENT ) {
+				bd->all_length = bd->content_length;
+			} else if ( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
+				bd->all_length = bd->chunk_all_length;
+			}
 			return DONE;
 		}
 	}
@@ -255,6 +260,7 @@ static status http_entitybody_start( http_entitybody_t * bd )
 			} else {
 				bd->content_end = bd->body_last->last;
 			}
+			bd->all_length = bd->content_length;
 			return DONE;
 		}
 	} else if( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {

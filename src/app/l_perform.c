@@ -222,13 +222,8 @@ static status perf_recv_body( event_t * ev )
 	} else if ( rc == DONE ) {
 		timer_del( &c->read->timer );
 		debug_log(  "%s --- success", __func__ );
-		if( p->response_body->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
-			 	p->response_body->content_length );
-		} else if( p->response_body->body_type == HTTP_ENTITYBODY_CHUNK ) {
-			performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
-			 	p->response_body->chunk_all_length );
-		}
+		performance_count_change( &perf_count.perform_recvs[p->pipeline_index],
+			p->response_body->all_length );
 		return perf_over( p, OK );
 	}
 	c->read->timer.data = (void*)p;
