@@ -1,7 +1,7 @@
 #include "lk.h"
 
-// l_mem_create_page -------
-status l_mem_create_page( l_mem_page_t ** alloc, uint32 size )
+// l_mem_page_create -------
+status l_mem_page_create( l_mem_page_t ** alloc, uint32 size )
 {
     char * p = NULL;
     uint32 length = 0;
@@ -23,8 +23,8 @@ status l_mem_create_page( l_mem_page_t ** alloc, uint32 size )
     *alloc = page;
     return OK;
 }
-// l_mem_free_page ------
-status l_mem_free_page( l_mem_page_t * page )
+// l_mem_page_free ------
+status l_mem_page_free( l_mem_page_t * page )
 {
     l_mem_page_t * n;
 
@@ -44,7 +44,7 @@ void * l_mem_alloc( l_mem_page_t * page, uint32 size )
     char * p;
 
     if( size > L_PAGE_SIZE ) {
-        if( OK != l_mem_create_page( &new, size ) ) {
+        if( OK != l_mem_page_create( &new, size ) ) {
             err_log("%s --- create page failed", __func__ );
             return NULL;
         }
@@ -70,7 +70,7 @@ void * l_mem_alloc( l_mem_page_t * page, uint32 size )
             q = cl;
             cl = cl->next;
         }
-        if( OK != l_mem_create_page( &new, L_PAGE_SIZE ) ) {
+        if( OK != l_mem_page_create( &new, L_PAGE_SIZE ) ) {
             err_log("%s --- create page failed", __func__ );
             return NULL;
         }

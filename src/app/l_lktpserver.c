@@ -35,7 +35,7 @@ static void lktpserv_client_send_heartbeat( void * data )
         lktpserv_over( lktp, ERROR );
         return;
     }
-    if( OK != l_mem_create_page( &lktp->lktp_request->page, 4096 ) ) {
+    if( OK != l_mem_page_create( &lktp->lktp_request->page, 4096 ) ) {
         err_log("%s --- lktp_request create memp page", __func__ );
         lktpserv_over( lktp, ERROR );
         return;
@@ -71,7 +71,7 @@ static status api_lktp_server_recv_heartbeat ( void * data )
         lktpserv_over( lktp, ERROR );
         return ERROR;
     }
-    if( OK != l_mem_create_page( &lktp->lktp_request->page, 4096 ) ) {
+    if( OK != l_mem_page_create( &lktp->lktp_request->page, 4096 ) ) {
         err_log("%s --- lktp_request create memp page", __func__ );
         lktpserv_over( lktp, ERROR );
         return ERROR;
@@ -100,7 +100,7 @@ static status api_lktp_server_recv_syn( void * data )
         lktpserv_over( lktp, ERROR );
         return ERROR;
     }
-    if( OK != l_mem_create_page( &lktp->lktp_request->page, 4096 ) ) {
+    if( OK != l_mem_page_create( &lktp->lktp_request->page, 4096 ) ) {
         err_log("%s --- lktp_request create memp page", __func__ );
         lktpserv_over( lktp, ERROR );
         return ERROR;
@@ -130,7 +130,7 @@ status lktpserv_over( lktp_manager_t * lktp, int32 status )
     timer_del( &lktp->timer_message );
     if( lktp->lktp_request ) {
         if( lktp->lktp_request->page ) {
-            l_mem_free_page( lktp->lktp_request->page );
+            l_mem_page_free( lktp->lktp_request->page );
         }
         lktp->lktp_request->page = NULL;
         l_safe_free( lktp->lktp_request );
@@ -358,7 +358,7 @@ static status lktp_register( event_t * ev )
         lktpserv_over( lktp, ERROR );
         return ERROR;
     }
-    if( OK != l_mem_create_page( &lktp->lktp_request->page, 4096 ) ) {
+    if( OK != l_mem_page_create( &lktp->lktp_request->page, 4096 ) ) {
         err_log("%s --- lktp_request create memp page", __func__ );
         lktpserv_over( lktp, ERROR );
         return ERROR;

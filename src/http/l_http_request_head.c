@@ -79,7 +79,6 @@ static status http_request_head_recv( connection_t * c, meta_t * meta )
 		debug_log("%s --- again", __func__ );
 		return AGAIN;
 	} else {
-		debug_log("%s --- recvd length [%d]", __func__, rc );
 		meta->last += rc;
 		return OK;
 	}
@@ -371,7 +370,7 @@ static status http_request_head_parse_header_line( http_request_head_t * request
 						break;
 					}
 				} else {
-					debug_log ( "%s --- s_name not support [%c]", __func__, *p );
+					err_log ( "%s --- s_name not support [%c]", __func__, *p );
 					return ERROR;
 				}
 				break;
@@ -427,7 +426,7 @@ static status http_request_head_process_headers( http_request_head_t * request )
 	c = request->c;
 	if( OK != mem_list_create( &request->headers_in.list,
 		sizeof(string_t) ) ) {
-		debug_log ( "%s --- headers_in list create", __func__ );
+		err_log ( "%s --- headers_in list create", __func__ );
 		return ERROR;
 	}
 	while( 1 ) {

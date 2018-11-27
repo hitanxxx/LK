@@ -15,7 +15,7 @@ static serv_api_t api_arr_web[] = {
 	{ string("/perform_info"),			api_perform_info },
 	{ string("/perform_start"),			api_perform_start },
 	{ string("/perform_stop"),			api_perform_stop },
-	{ string("/proxy"),					api_proxy 		},
+	{ string("/proxy"),					api_proxy },
 	{ string("/tunnel_set"),			api_tunnel_setting },
 	{ string("/file_upload"),			api_file_upload },
 	{ string_null,						NULL			}
@@ -24,9 +24,10 @@ static serv_api_t api_arr_web[] = {
 status api_file_upload( void * data )
 {
 	webser_t * webser;
-	meta_t file;
-	status rc;
-	int32 ffd;
+	l_mem_page_t * page;
+	meta_t * upload_file_meta;
+	int32 upload_file;
+	ssize_t rc;
 
 	webser = data;
 	// upload limit 1m
@@ -35,9 +36,44 @@ status api_file_upload( void * data )
 			"file size limit 1m",
 			l_strlen("file size limit 1m") );
 	}
-	return OK;
+	if( OK != l_mem_page_create( &page, 4096 ) ) {
+		err_log("%s --- mem page create", __func__ );
+		return api_web_response_failed( webser,
+			"Alloc mem page",
+			l_strlen("Alloc mem page") );
+	}
+	if( OK != meta_page_get_all( page,
+	webser->request_body->body_head,
+ 	&upload_file_meta ) ) {
+		err_log("%s --- get body meta failed", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Get body meta",
+			l_strlen("Get body meta") );
+	}
+	debug_log("%s --- upload [%.*s]", __func__,
+ 	meta_len( upload_file_meta->pos, upload_file_meta->last ),
+ 	upload_file_meta->pos );
+	upload_file = open( L_PATH_UOLOAD_FILE, O_CREAT|O_RDWR|O_TRUNC, 0644 );
+	if( upload_file == ERROR ) {
+		err_log("%s --- open file failed", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Open file failed",
+			l_strlen("Open file failed") );;
+	}
+	rc = write( upload_file, upload_file_meta->pos,
+		meta_len( upload_file_meta->pos, upload_file_meta->last ) );
+	if( rc == ERROR ) {
+		err_log("%s --- write uoload to file failed", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Write uoload to file failed",
+			l_strlen("Write uoload to file failed") );;
+	}
+	l_mem_page_free( page );
+	return api_web_response_success( webser );
 }
-
 // api_tunnel_setting -------------
 status api_tunnel_setting( void * data )
 {

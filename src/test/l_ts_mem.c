@@ -7,7 +7,7 @@ static void ts_mem_alloc_page( void )
 {
     status rc;
 
-    rc = l_mem_create_page( &page, 4096 );
+    rc = l_mem_page_create( &page, 4096 );
     t_assert( rc == OK );
 }
 // ----------
@@ -50,7 +50,7 @@ static void ts_mem_free_page( void )
 {
     status rc;
 
-    rc = l_mem_free_page( page );
+    rc = l_mem_page_free( page );
     page = NULL;
     t_assert( rc == OK );
 }

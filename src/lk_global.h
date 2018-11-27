@@ -45,6 +45,7 @@
 #define 	L_PATH_PERFTEMP			"/usr/local/lk/logs/l_perf"
 #define 	L_PATH_LOG_MAIN			"/usr/local/lk/logs/l_log"
 #define 	L_PATH_LOG_ACCESS		"/usr/local/lk/logs/l_access"
+#define 	L_PATH_UOLOAD_FILE		"/usr/local/lk/logs/l_upload_temp"
 
 #define 	HTTP_METHOD_GET		0x000a
 #define		HTTP_METHOD_HEAD	0x000b

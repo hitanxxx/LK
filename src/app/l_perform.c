@@ -819,7 +819,7 @@ static status performance_setting_end( void )
 	if( perf_settings.list_pipeline ) {
 		for( i = 0; i < perf_settings.list_pipeline->elem_num; i ++ ) {
 			pipeline = mem_list_get( perf_settings.list_pipeline, i+1 );
-			l_mem_free_page( pipeline->page );
+			l_mem_page_free( pipeline->page );
 		}
 		mem_list_free( perf_settings.list_pipeline );
 		perf_settings.list_pipeline = NULL;
@@ -891,7 +891,7 @@ static status performance_setting_init( json_t * json )
 	mem_list_create( &perf_settings.list_pipeline, sizeof(perform_pipeline_t) );
 	for( i = 1; i <= x->list->elem_num; i ++ ) {
 		pipeline = mem_list_push( perf_settings.list_pipeline );
-		if( OK != l_mem_create_page( &pipeline->page, 4096 ) ) {
+		if( OK != l_mem_page_create( &pipeline->page, 4096 ) ) {
 			err_log("%s --- mem page create", __func__ );
 			return ERROR;
 		}

@@ -20,7 +20,8 @@ status meta_file_alloc( meta_t ** meta, uint32 length )
 	*meta = new;
 	return OK;
 }
-status meta_page_alloc( l_mem_page_t * page, meta_t ** out, uint32 size )
+// meta_page_alloc ----------
+status meta_page_alloc ( l_mem_page_t * page, meta_t ** out, uint32 size )
 {
 	meta_t * new = NULL;
 
@@ -40,6 +41,34 @@ status meta_page_alloc( l_mem_page_t * page, meta_t ** out, uint32 size )
 	new->start = new->pos = new->last = new->data;
 	new->end = new->start + size*sizeof(char);
 
+	*out = new;
+	return OK;
+}
+// meta_page_get_all ---------
+status meta_page_get_all( l_mem_page_t * page, meta_t * in, meta_t ** out )
+{
+	uint32 len = 0, part_len = 0;
+	meta_t * cl, *new;
+	char * p = NULL;
+
+	cl = in;
+	while( cl ) {
+		len += meta_len( cl->pos, cl->last );
+		cl = cl->next;
+	}
+	if( OK != meta_page_alloc( page, &new, len ) ) {
+		err_log("%s --- alloc meta mem", __func__ );
+		return ERROR;
+	}
+	p = new->data;
+	cl = in;
+	while( cl ) {
+		part_len = meta_len( cl->pos, cl->last );
+		memcpy( p, cl->pos, part_len );
+		p += part_len;
+		cl = cl->next;
+	}
+	new->last += len;
 	*out = new;
 	return OK;
 }
