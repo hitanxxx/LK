@@ -1,6 +1,6 @@
 #include "lk.h"
 
-static heap_t * heap;
+static heap_t * heap = NULL;
 // timer_add -----------------------------------------
 status timer_add( timer_msg_t * timer, uint32 sec )
 {
@@ -73,5 +73,8 @@ status timer_init( void )
 // timer_end ----------------------------------
 status timer_end( void )
 {
+	if( heap ) {
+		heap_free( heap );
+	}
 	return OK;
 }
