@@ -118,45 +118,30 @@ status ssl_client_ctx( SSL_CTX ** s )
 	*s = ctx_client;
 	return OK;
 }
-// ssl_certs -----------------------------
-static status ssl_certs( )
-{
-	int32 rc;
-	char crt[100];
-	char key[100];
-
-	memset( crt, 0, 100 );
-	memset( key, 0, 100 );
-	memcpy( crt, conf.sslcrt.data, conf.sslcrt.len );
-	memcpy( key, conf.sslkey.data, conf.sslkey.len );
-
-	rc = SSL_CTX_use_certificate_chain_file (ctx_server, crt);
-	if( rc != 1 ) {
-		err_log ( "%s --- crt error", __func__ );
-		return ERROR;
-	}
-
-	rc = SSL_CTX_use_PrivateKey_file( ctx_server, key, SSL_FILETYPE_PEM );
-	if( rc != 1 ) {
-		err_log ( "%s --- key error", __func__ );
-		return ERROR;
-	}
-
-	rc = SSL_CTX_check_private_key( ctx_server );
-	if( rc != 1 ) {
-		err_log ( "%s --- check error", __func__ );
-		return ERROR;
-	}
-
-	return OK;
-}
 // ssl_get_server_ctx -------------------
 status ssl_server_ctx( SSL_CTX ** s )
 {
+	int32 rc;
+	char crt[L_SSL_CERT_PATH_LEN] = {0};
+	char key[L_SSL_KEY_PATH_LEN] = {0};
+
 	if( !ctx_server ) {
 		ctx_server = SSL_CTX_new( SSLv23_server_method() );
-		if( OK != ssl_certs( ) ) {
-			err_log ( "%s --- ssl certs error", __func__ );
+		l_memcpy( crt, conf.sslcrt.data, conf.sslcrt.len );
+		l_memcpy( key, conf.sslkey.data, conf.sslkey.len );
+		rc = SSL_CTX_use_certificate_chain_file (ctx_server, crt);
+		if( rc != 1 ) {
+			err_log ( "%s --- [SSL_CTX_use_certificate_chain_file] failed", __func__ );
+			return ERROR;
+		}
+		rc = SSL_CTX_use_PrivateKey_file( ctx_server, key, SSL_FILETYPE_PEM );
+		if( rc != 1 ) {
+			err_log ( "%s --- [SSL_CTX_use_PrivateKey_file] failed", __func__ );
+			return ERROR;
+		}
+		rc = SSL_CTX_check_private_key( ctx_server );
+		if( rc != 1 ) {
+			err_log ( "%s --- [SSL_CTX_check_private_key] error", __func__ );
 			return ERROR;
 		}
 	}
@@ -278,29 +263,32 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 	ssl_connection_t * sc = NULL;
 	SSL_CTX * ctx;
 
+	if ( (flag != L_SSL_CLIENT) && (flag != L_SSL_SERVER) ) {
+		err_log("%s --- flag not support", __func__ );
+		return ERROR;
+	}
 	sc = (ssl_connection_t*)l_safe_malloc( sizeof(ssl_connection_t) );
 	if( !sc ) {
-		err_log ( "%s --- l_safe_malloc sc", __func__ );
+		err_log ( "%s --- malloc ssl connection", __func__ );
 		return ERROR;
 	}
 	memset( sc, 0, sizeof(ssl_connection_t) );
-
 	if( flag == L_SSL_CLIENT ) {
 		ssl_client_ctx( &ctx );
 	} else {
 		ssl_server_ctx( &ctx );
 	}
 	sc->session_ctx = ctx;
-	sc->con = SSL_new( ctx );
+	sc->con = SSL_new( sc->session_ctx );
 	if( !sc->con ) {
-		err_log ( "%s --- SSL_new null", __func__ );
+		err_log ( "%s --- SSL_new failed", __func__ );
 		l_safe_free( sc );
 		return ERROR;
 	}
 	sc->data = (void*)c;
 
 	if( SSL_set_fd( sc->con, c->fd ) == 0 ) {
-		err_log ( "%s --- SSL_set_fd", __func__ );
+		err_log ( "%s --- SSL_set_fd failed", __func__ );
 		SSL_free( sc->con );
 		l_safe_free( sc );
 		return ERROR;
@@ -311,7 +299,7 @@ status ssl_create_connection( connection_t * c, uint32 flag )
 		SSL_set_accept_state( sc->con );
 	}
 	if( SSL_set_ex_data( sc->con, ssl_con_index, c ) == 0 ) {
-		err_log ( "%s --- set_ex_data", __func__ );
+		err_log ( "%s --- SSL_set_ex_data failed", __func__ );
 		SSL_free( sc->con );
 		l_safe_free( sc );
 		return ERROR;
@@ -330,5 +318,7 @@ status ssl_init( void )
 // ssl_end ------------------------------
 status ssl_end( void )
 {
+	ERR_free_strings();
+	EVP_cleanup();
 	return OK;
 }

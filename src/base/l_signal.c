@@ -51,7 +51,7 @@ static void l_signal_handler( int32 lsignal )
 		signal handler don't change anything, and will be return immediately.
 		so don't need any mutex lock.
 	*/
-
+	debug_log("%s --- ", __func__ );
 	errno_cache = errno;
 	global_signal = lsignal;
 	if( process_id == 0xffff ) {
