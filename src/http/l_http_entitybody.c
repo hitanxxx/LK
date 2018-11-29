@@ -165,7 +165,7 @@ static status http_entity_process_content( http_entitybody_t * bd )
 			return AGAIN;
 		} else {
 			bd->body_last->last += rc;
-			bd->content_need -= rc;
+			bd->content_need -= (uint32)rc;
 			if( !bd->content_need ) {
 				bd->all_length = bd->content_length;
 				return DONE;

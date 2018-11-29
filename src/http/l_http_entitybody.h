@@ -20,8 +20,7 @@ struct http_entitybody_t {
 	uint32				cache;
 	// content infos
 	uint32				content_length;
-	ssize_t				content_need;
-	//char *				content_end;
+	uint32				content_need;
 	// chunked infos
 	uint32 				chunk_length;
 	uint32				chunk_recvd;
