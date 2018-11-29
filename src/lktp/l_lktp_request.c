@@ -21,7 +21,7 @@ status lktp_request_create( lktp_request_t * lktp_request )
 	alloc_length += l_strlen(body_len_arr);
 	alloc_length += l_strlen("|");
 
-	if( OK != meta_page_alloc( lktp_request->page, &new, alloc_length ) ) {
+	if( OK != meta_page_alloc( lktp_request->page, alloc_length, &new ) ) {
 		err_log("%s --- meta_page_alloc failed", __func__ );
 		return ERROR;
 	}
