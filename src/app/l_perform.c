@@ -342,21 +342,13 @@ static status perf_send_prepare_request( perform_pipeline_t * pipeline )
 	// \r\n
 	request_length += l_strlen("\r\n");
 	// body part
-	if( pipeline->method.len == l_strlen("post") ) {
-		if( strncmp( pipeline->method.data, "post", l_strlen("post") ) == 0 ||
-			strncmp( pipeline->method.data, "POST", l_strlen("POST") ) == 0 ) {
-			if( pipeline->body.len > 0 ) {
-				request_length += pipeline->body.len;
-			}
-		}
-	} else if ( pipeline->method.len == l_strlen("put") ) {
-		if( strncmp( pipeline->method.data, "put", l_strlen("put") ) == 0 ||
-			strncmp( pipeline->method.data, "PUT", l_strlen("PUT") ) == 0  ) {
-			if( pipeline->body.len > 0 ) {
-				request_length += pipeline->body.len;
-			}
+	if ( (OK == l_strncmp_cap( pipeline->method.data, pipeline->method.len, "POST", l_strlen("POST") ) ) ||
+ 		 (OK == l_strncmp_cap( pipeline->method.data, pipeline->method.len, "PUT", l_strlen("PUT") ) ) ) {
+		if( pipeline->body.len > 0 ) {
+			request_length += pipeline->body.len;
 		}
 	}
+
 	// build request string
 	pipeline->request_meta = l_mem_alloc( pipeline->page, request_length +
  	(uint32)sizeof(meta_t) );
@@ -416,21 +408,11 @@ static status perf_send_prepare_request( perform_pipeline_t * pipeline )
 	memcpy( p, "\r\n", l_strlen("\r\n") );
 	p += l_strlen("\r\n");
 
-	if( pipeline->method.len == l_strlen("post") ) {
-		if( strncmp( pipeline->method.data, "post", l_strlen("post") ) == 0 ||
-	strncmp( pipeline->method.data, "POST", l_strlen("POST") ) == 0 ) {
-			if( pipeline->body.len > 0 ) {
-				memcpy( p, pipeline->body.data, pipeline->body.len );
-				p += pipeline->body.len;
-			}
-		}
-	} else if ( pipeline->method.len == l_strlen("put") ) {
-		if( strncmp( pipeline->method.data, "put", l_strlen("put") ) == 0 ||
-	strncmp( pipeline->method.data, "PUT", l_strlen("PUT") ) == 0 ) {
-			if( pipeline->body.len > 0 ) {
-				memcpy( p, pipeline->body.data, pipeline->body.len );
-				p += pipeline->body.len;
-			}
+	if ( (OK == l_strncmp_cap( pipeline->method.data, pipeline->method.len, "POST", l_strlen("POST") ) ) ||
+ 		 (OK == l_strncmp_cap( pipeline->method.data, pipeline->method.len, "PUT", l_strlen("PUT") ) ) ) {
+		if( pipeline->body.len > 0 ) {
+			memcpy( p, pipeline->body.data, pipeline->body.len );
+			p += pipeline->body.len;
 		}
 	}
 	pipeline->request_meta->last = p;
@@ -655,135 +637,62 @@ status performance_count_output( json_t ** data )
 		err_log(  "%s --- json create", __func__ );
 		return ERROR;
 	}
-	root = mem_list_push( json->list );
-	root->type = JSON_OBJ;
+	root = json_add_obj( json );
+	length = json_obj_add_child( root, length_str.data, length_str.len );
+	json_add_num( length, ( perf_settings.list_pipeline ? perf_settings.list_pipeline->elem_num : 0 ) );
 
-	mem_list_create( &root->list, sizeof(json_t) );
-	length_name = mem_list_push( root->list );
-	length_name->type = JSON_STR;
-	length_name->name.data = length_str.data;
-	length_name->name.len = length_str.len;
-	mem_list_create( &length_name->list, sizeof(json_t) );
-	length = mem_list_push( length_name->list );
-	length->type = JSON_NUM;
-	length->num = perf_settings.list_pipeline ?
-	perf_settings.list_pipeline->elem_num : 0;
+	ob_name = json_obj_add_child( root, arr_name.data, arr_name.len );
+	ob_arr = json_add_arr( ob_name );
 
-	ob_name = mem_list_push( root->list );
-	ob_name->type = JSON_STR;
-	ob_name->name.data = arr_name.data;
-	ob_name->name.len = arr_name.len;
-	mem_list_create( &ob_name->list, sizeof(json_t) );
-	ob_arr = mem_list_push( ob_name->list );
-	ob_arr->type = JSON_ARR;
-
-	mem_list_create( &ob_arr->list, sizeof(json_t) );
 	if( perf_settings.list_pipeline ) {
 		for( i = 1; i <= perf_settings.list_pipeline->elem_num; i ++ ) {
 			pipeline = mem_list_get( perf_settings.list_pipeline, i );
-			obj = mem_list_push( ob_arr->list );
-			obj->type = JSON_OBJ;
-			mem_list_create( &obj->list, sizeof(json_t) );
+
+			obj = json_add_obj( ob_arr );
 
 			// index
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = index_str.data;
-			v->name.len = index_str.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = pipeline->index;
+			v = json_obj_add_child( obj, index_str.data, index_str.len );
+			json_add_num( v, pipeline->index );
+
 			// success
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = success_str.data;
-			v->name.len = success_str.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_success[i-1];
+			v = json_obj_add_child( obj, success_str.data, success_str.len );
+			json_add_num( v, perf_count.perform_success[i-1] );
+
 			// failed
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = failed_str.data;
-			v->name.len = failed_str.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_failed[i-1];
+			v = json_obj_add_child( obj, failed_str.data, failed_str.len );
+			json_add_num( v, perf_count.perform_failed[i-1] );
+
 			// send
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = send_str.data;
-			v->name.len = send_str.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_sends[i-1];
+			v = json_obj_add_child( obj, send_str.data, send_str.len );
+			json_add_num( v, perf_count.perform_sends[i-1] );
+
 			// recv
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = recv_str.data;
-			v->name.len = recv_str.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_recvs[i-1];
+			v = json_obj_add_child( obj, recv_str.data, recv_str.len );
+			json_add_num( v, perf_count.perform_recvs[i-1] );
+
 			// 200
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_200.data;
-			v->name.len = str_200.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_200[i-1];
+			v = json_obj_add_child( obj, str_200.data, str_200.len );
+			json_add_num( v, perf_count.perform_200[i-1] );
+
 			// 1xx
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_1xx.data;
-			v->name.len = str_1xx.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_1xx[i-1];
+			v = json_obj_add_child( obj, str_1xx.data, str_1xx.len );
+			json_add_num( v, perf_count.perform_1xx[i-1] );
+
 			// 2xx
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_2xx.data;
-			v->name.len = str_2xx.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_2xx[i-1];
+			v = json_obj_add_child( obj, str_2xx.data, str_2xx.len );
+			json_add_num( v, perf_count.perform_2xx[i-1] );
+
 			// 3xx
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_3xx.data;
-			v->name.len = str_3xx.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_3xx[i-1];
+			v = json_obj_add_child( obj, str_3xx.data, str_3xx.len );
+			json_add_num( v, perf_count.perform_3xx[i-1] );
+
 			// 4xx
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_4xx.data;
-			v->name.len = str_4xx.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_4xx[i-1];
+			v = json_obj_add_child( obj, str_4xx.data, str_4xx.len );
+			json_add_num( v, perf_count.perform_4xx[i-1] );
+
 			// 5xx
-			v = mem_list_push( obj->list );
-			v->type = JSON_STR;
-			v->name.data = str_5xx.data;
-			v->name.len = str_5xx.len;
-			mem_list_create( &v->list, sizeof(json_t) );
-			vv = mem_list_push( v->list );
-			vv->type = JSON_NUM;
-			vv->num = perf_count.perform_5xx[i-1];
+			v = json_obj_add_child( obj, str_5xx.data, str_5xx.len );
+			json_add_num( v, perf_count.perform_5xx[i-1] );
 		}
 	}
 	*data = json;
@@ -845,11 +754,11 @@ string_t *host )
 			pipeline->method.len == method->len &&
 			pipeline->uri.len == uri->len &&
 			pipeline->host.len == host->len &&
-			strncmp( pipeline->ip.data, ip->data, ip->len ) == 0 &&
-			strncmp( pipeline->method.data, method->data, method->len ) == 0 &&
-			strncmp( pipeline->uri.data, uri->data, uri->len ) == 0 &&
-			strncmp( pipeline->host.data, host->data, host->len ) == 0
-		) {
+			( OK == l_strncmp_cap( pipeline->ip.data, pipeline->ip.len, ip->data, ip->len ) ) &&
+			( OK == l_strncmp_cap( pipeline->method.data, pipeline->method.len, method->data, method->len ) ) &&
+			( OK == l_strncmp_cap( pipeline->uri.data, pipeline->uri.len, uri->data, uri->len ) ) &&
+			( OK == l_strncmp_cap( pipeline->host.data, pipeline->host.len, host->data, host->len ) )
+			) {
 			return OK;
 		}
 	}
@@ -1138,24 +1047,15 @@ status perform_init( void )
 		return ERROR;
 	}
 	perf_count.perform_success = (l_atomic_t*)( shm_ptr );
-	perf_count.perform_failed = (l_atomic_t*)
-			( perf_count.perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_recvs = (l_atomic_t*)
-			( perf_count.perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_sends = (l_atomic_t*)
-			( perf_count.perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_200 = (l_atomic_t*)
-			( perf_count.perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_1xx = (l_atomic_t*)
-			( perf_count.perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_2xx = (l_atomic_t*)
-			( perf_count.perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_3xx = (l_atomic_t*)
-			( perf_count.perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_4xx = (l_atomic_t*)
-			( perf_count.perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
-	perf_count.perform_5xx = (l_atomic_t*)
-			( perf_count.perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_failed = (l_atomic_t*) ( perf_count.perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_recvs = (l_atomic_t*) ( perf_count.perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_sends = (l_atomic_t*) ( perf_count.perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_200 = (l_atomic_t*) ( perf_count.perform_sends + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_1xx = (l_atomic_t*) ( perf_count.perform_200 + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_2xx = (l_atomic_t*) ( perf_count.perform_1xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_3xx = (l_atomic_t*) ( perf_count.perform_2xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_4xx = (l_atomic_t*) ( perf_count.perform_3xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
+	perf_count.perform_5xx = (l_atomic_t*) ( perf_count.perform_4xx + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
 	return OK;
 }
 // perform_end --------------
