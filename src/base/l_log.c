@@ -143,5 +143,6 @@ status log_init( void )
 status log_end( void )
 {
 	close( log_fd_main );
+	close( log_fd_access );
 	return OK;
 }
