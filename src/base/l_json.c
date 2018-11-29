@@ -3,6 +3,7 @@
 static status json_parse_token( json_t * parent, json_content_t * content );
 status json_free( json_t * json );
 
+
 // json_get_child -----
 status json_get_child( json_t * parent, uint32 index, json_t ** child )
 {
@@ -26,8 +27,7 @@ status json_get_child_by_name( json_t * parent, char * str, uint32 length, json_
 	}
 	for( i = 1; i <= parent->list->elem_num; i ++ ) {
 		json_get_child( parent, i, &k );
-		if( strncmp( k->name.data, str, length ) == 0 &&
-		k->name.len == length ) {
+		if( OK == l_strncmp_cap( k->name.data, k->name.len, str, length ) ) {
 			json_get_child( k, 1, &v );
 			*child = v;
 			return OK;
@@ -101,7 +101,6 @@ status json_get_obj_obj( json_t * obj, char * str, uint32 length, json_t ** chil
 	}
 	return OK;
 }
-
 // json_parse_true -------
 static status json_parse_true( json_content_t * content )
 {
@@ -137,7 +136,6 @@ static status json_parse_true( json_content_t * content )
 	}
 	return ERROR;
 }
-
 // json_parse_false ------
 static status json_parse_false( json_content_t * content )
 {
@@ -331,8 +329,7 @@ static status json_parse_obj_find_repeat( json_t * parent, json_t * child )
 
 	for( i = 1; i <= parent->list->elem_num; i ++ ) {
 		t = mem_list_get( parent->list, i );
-		if( t->name.len == child->name.len &&
-				strncmp( t->name.data, child->name.data, t->name.len ) == 0 ) {
+		if( OK == l_strncmp_cap( t->name.data, t->name.len, child->name.data, child->name.len ) ) {
 			time ++;
 		}
 	}
@@ -780,29 +777,91 @@ status json_decode( json_t ** json, char * p, char * end )
 	return OK;
 }
 
-// json_free_token ------
-static status json_free_token( json_t * json )
+// json_add_child -------
+static json_t * json_add_child( json_t * parent, uint32 type )
 {
-	uint32 i;
-	json_t * l_safe_free;
+	json_t * new = NULL;
 
-	if( json->list != NULL ) {
-		for( i=1; i <= json->list->elem_num; i ++ ) {
-			l_safe_free = mem_list_get( json->list, i );
-			json_free_token( l_safe_free );
+	if( !parent->list ) {
+		if( OK != mem_list_create( &parent->list, sizeof(json_t) ) ) {
+			err_log("%s --- list create failed", __func__ );
+			return NULL;
 		}
-		mem_list_free( json->list );
 	}
-	return OK;
+	new = mem_list_push( parent->list);
+	if( !new) {
+		err_log("%s --- list push failed", __func__ );
+		return NULL;
+	}
+	new->type = type;
+	return new;
 }
-// json_free -----------
-status json_free( json_t * json )
+// json_add_obj -----
+json_t * json_add_obj( json_t * parent )
 {
-	if( OK != json_free_token( json ) ) {
-		return ERROR;
+	return json_add_child( parent, JSON_OBJ );
+}
+// json_add_arr ------
+json_t * json_add_arr( json_t * parent )
+{
+	return json_add_child( parent, JSON_ARR );
+}
+// json_add_true -----
+json_t * json_add_true( json_t * parent )
+{
+	return json_add_child( parent, JSON_TRUE );
+}
+// json_add_false ------
+json_t * json_add_false ( json_t * parent )
+{
+	return json_add_child( parent, JSON_FALSE );
+}
+// json_add_null ------
+json_t * json_add_null( json_t * parent )
+{
+	return json_add_child( parent, JSON_NULL );
+}
+// json_add_str ------
+json_t * json_add_str( json_t * parent, char * str, uint32 length )
+{
+	json_t * new = NULL;
+
+	new = json_add_child( parent, JSON_STR );
+	if( !new ) {
+		err_log("%s --- json add child failed", __func__ );
+		return NULL;
 	}
-	l_safe_free( json );
-	return OK;
+	new->name.data = str;
+	new->name.len = length;
+	return new;
+}
+// json_add_num -------
+json_t * json_add_num ( json_t * parent, uint32 num )
+{
+	json_t * new = NULL;
+
+	new = json_add_child( parent, JSON_NUM );
+	if( !new ) {
+		err_log("%s --- json add child failed", __func__ );
+		return NULL;
+	}
+	new->num = (double)num;
+	return new;
+}
+// json_obj_add_child -------
+json_t * json_obj_add_child( json_t * parent, char * str, uint32 length )
+{
+	json_t * new = NULL;
+
+	new = json_add_child( parent, JSON_NUM );
+	if( !new ) {
+		err_log("%s --- json add child failed", __func__ );
+		return NULL;
+	}
+	new->type = 0;
+	new->name.data = str;
+	new->name.len = length;
+	return new;
 }
 // json_stringify_token_len -------
 static uint32 json_stringify_token_len( json_t * json )
@@ -959,7 +1018,6 @@ static char* json_stringify_token( json_t * json, char * p )
 	}
 	return NULL;
 }
-
 // json_encode ----------
 status json_encode( json_t * json, meta_t ** string )
 {
@@ -987,7 +1045,30 @@ status json_encode( json_t * json, meta_t ** string )
 	*string = meta;
 	return OK;
 }
+// json_free_token ------
+static status json_free_token( json_t * json )
+{
+	uint32 i;
+	json_t * l_safe_free;
 
+	if( json->list != NULL ) {
+		for( i=1; i <= json->list->elem_num; i ++ ) {
+			l_safe_free = mem_list_get( json->list, i );
+			json_free_token( l_safe_free );
+		}
+		mem_list_free( json->list );
+	}
+	return OK;
+}
+// json_free -----------
+status json_free( json_t * json )
+{
+	if( OK != json_free_token( json ) ) {
+		return ERROR;
+	}
+	l_safe_free( json );
+	return OK;
+}
 // json_create -----------
 status json_create( json_t ** json )
 {
