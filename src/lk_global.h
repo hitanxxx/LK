@@ -63,6 +63,7 @@
 #define 	HTTP_PARSE_HEADER_DONE						14
 #define 	HTTP_PARSE_INVALID_HEADER					13
 
+#define l_abs(x)					(((x)>=0)?(x):(-(x)))
 #define l_unused( x ) 			 	((void)x)
 #define l_safe_free( x )			(free(x))
 #define l_safe_malloc( len )		(malloc((size_t)(len)))
