@@ -16,7 +16,7 @@ status config_get ( meta_t ** meta, char * path )
 	}
 	length = (uint32)stconf.st_size;
 	if( length > CONF_SETTING_LENGTH ) {
-		err_log( "%s --- config.json > CONF_SETTING_LENGTH" );
+		err_log( "%s --- config.json too big, limit [32768byte]" );
 		return ERROR;
 	}
 	if( OK != meta_alloc( &new, length ) ) {
@@ -64,6 +64,10 @@ static status config_parse_global( json_t * json )
 		conf.accept_mutex = (v->type == JSON_TRUE) ? 1 : 0;
 	}
 	if( OK == json_get_obj_str(root_obj, "sslcrt", l_strlen("sslcrt"), &v ) ) {
+		if( v->name.len > L_SSL_CERT_PATH_LEN ) {
+			err_log("%s --- ssl cert file path to long, limit = 128", __func__ );
+			return ERROR;
+		}
 		conf.sslcrt.data = v->name.data;
 		conf.sslcrt.len = v->name.len;
 		memset( str, 0, sizeof(str) );
@@ -75,6 +79,10 @@ static status config_parse_global( json_t * json )
 		}
 	}
 	if( OK == json_get_obj_str(root_obj, "sslkey", l_strlen("sslkey"), &v ) ) {
+		if( v->name.len > L_SSL_KEY_PATH_LEN ) {
+			err_log("%s --- ssl cert file path to long, limit = 128", __func__ );
+			return ERROR;
+		}
 		conf.sslkey.data = v->name.data;
 		conf.sslkey.len = v->name.len;
 		memset( str, 0, sizeof(str) );
@@ -166,27 +174,22 @@ static status config_parse_tunnel( json_t * json )
 		// server
 		// client
 		// single
-		if( v->name.len == l_strlen("xxxxxx") ) {
-			if( strncmp( v->name.data, "single", v->name.len ) == 0 ) {
-				conf.tunnel_mode = TUNNEL_SINGLE;
-			} else if ( strncmp( v->name.data, "client", v->name.len ) == 0 ) {
-				conf.tunnel_mode = TUNNEL_CLIENT;
-				rc = json_get_obj_str(tunnel_obj, "serverip", l_strlen("serverip"), &v );
-				if( rc == ERROR ) {
-					err_log("%s --- tunnel mode client need specify a valid 'serverip'", __func__ );
-					return ERROR;
-				}
-				conf.serverip.data = v->name.data;
-				conf.serverip.len = v->name.len;
-			} else if ( strncmp( v->name.data, "server", v->name.len ) == 0 ) {
-				conf.tunnel_mode = TUNNEL_SERVER;
-			} else {
-				err_log("%s --- tunnel invalid 'mode' [%.*s]", __func__,
-				v->name.len, v->name.data );
+		if( OK == l_strncmp_cap( v->name.data, v->name.len, "single", l_strlen("single") ) ) {
+			conf.tunnel_mode = TUNNEL_SINGLE;
+		} else if ( OK == l_strncmp_cap( v->name.data, v->name.len, "server", l_strlen("server") ) ) {
+			conf.tunnel_mode = TUNNEL_SERVER;
+		} else if ( OK == l_strncmp_cap( v->name.data, v->name.len, "client", l_strlen("client") ) ) {
+			conf.tunnel_mode = TUNNEL_CLIENT;
+			rc = json_get_obj_str(tunnel_obj, "serverip", l_strlen("serverip"), &v );
+			if( rc == ERROR ) {
+				err_log("%s --- tunnel mode client need specify a valid 'serverip'", __func__ );
 				return ERROR;
 			}
+			conf.serverip.data = v->name.data;
+			conf.serverip.len = v->name.len;
 		} else {
-			err_log("%s --- tunnel invalid 'mode' length [%d]", __func__, v->name.len );
+			err_log("%s --- tunnel invalid 'mode' [%.*s]", __func__,
+			v->name.len, v->name.data );
 			return ERROR;
 		}
 	}
@@ -224,21 +227,19 @@ static status config_parse_lktp( json_t * json )
 			err_log("%s --- lktp need specify a valid 'mode'", __func__ );
 			return ERROR;
 		}
-		if( v->name.len == l_strlen("xxxxxx") ) {
-			if( strncmp( v->name.data, "server", l_strlen("server") ) == 0  ) {
-				conf.lktp_mode = LKTP_SERVER;
-			} else if ( strncmp( v->name.data, "client", l_strlen("client") ) == 0 ) {
-				conf.lktp_mode = LKTP_CLIENT;
-				if( OK != json_get_obj_str(lktp_obj, "serverip", l_strlen("serverip"), &v ) ) {
-					err_log("%s --- lktp client need specify server ip", __func__ );
-					return ERROR;
-				}
-				conf.lktp_serverip.data = v->name.data;
-				conf.lktp_serverip.len = v->name.len;
-			} else {
-				err_log("%s --- not support lktp mode, [%.*s]", __func__, v->name.len, v->name.data );
+		if( OK == l_strncmp_cap( v->name.data, v->name.len, "server", l_strlen("server") ) ) {
+			conf.lktp_mode = LKTP_SERVER;
+		} else if ( OK == l_strncmp_cap( v->name.data, v->name.len, "client", l_strlen("client") ) ) {
+			conf.lktp_mode = LKTP_CLIENT;
+			if( OK != json_get_obj_str(lktp_obj, "serverip", l_strlen("serverip"), &v ) ) {
+				err_log("%s --- lktp client need specify server ip", __func__ );
 				return ERROR;
 			}
+			conf.lktp_serverip.data = v->name.data;
+			conf.lktp_serverip.len = v->name.len;
+		} else {
+			err_log("%s --- not support lktp mode, [%.*s]", __func__, v->name.len, v->name.data );
+			return ERROR;
 		}
 	}
 	return OK;
