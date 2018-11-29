@@ -11,8 +11,7 @@ status serv_api_find( string_t * key, serv_api_handler * handler )
 	for( i = 0; i < api_list->elem_num; i ++ ) {
 		t = mem_list_get( api_list, i + 1 );
 		s = *t;
-		if( s->name.len == key->len &&
-			strncmp( s->name.data, key->data, key->len ) == 0 ) {
+		if( OK == l_strncmp_cap( s->name.data, s->name.len, key->data, key->len ) ) {
 			if( handler ) {
 				*handler = s->handler;
 			}
