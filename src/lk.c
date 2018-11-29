@@ -3,28 +3,41 @@
 static char * l_process_signal = NULL;
 static int32  l_process_signal_type = 0;
 
-static module_init_pt static_modules[] = {
-	log_init,
-	config_init,
-	l_signal_init,
-	process_init,
-	listen_init,
-	event_init,
-	ssl_init,
-	tunnel_init,
-	webser_init,
-	perform_init,
-	serv_init,
-	webapi_init,
-	timer_init,
-	lktpserv_init,
-	NULL
-};
-
+// module_init -----------------
+static status module_init( void )
+{
+	log_init();
+	config_init();
+	l_signal_init();	// no end
+	process_init();		// no end
+	listen_init();
+	event_init();
+	ssl_init();			// no end
+	serv_init();
+	tunnel_init();		// no end
+	webser_init();		// no end
+	perform_init();
+	webapi_init();		// no end
+	lktpserv_init();	// no end
+	return OK;
+}
+// modules_end ----------------
+status modules_end( void )
+{
+	debug_log("%s --- ", __func__ );
+	log_end();
+	config_end();
+	listen_end();
+	event_end();
+	serv_end();
+	perform_end();
+	return OK;
+}
 // dynamic_module_init ------------
 status dynamic_module_init( void )
 {
 	net_init();
+	timer_init();
 	event_process_init();
 	http_response_head_init_module();
 	http_request_head_init_module();
@@ -39,8 +52,10 @@ status dynamic_module_init( void )
 // dynamic_module_end ------------
 status dynamic_module_end( void )
 {
+	debug_log("%s --- ", __func__ );
 	net_end();
-	event_process_end( );
+	timer_end();
+	event_process_end();
 	http_response_head_end_module();
 	http_request_head_end_module();
 	http_entitybody_end_module();
@@ -128,30 +143,6 @@ static status create_pid_file(  )
 static status delete_pid_file(  )
 {
 	unlink( L_PATH_PIDFILE );
-	return OK;
-}
-// module_init -----------------
-static status module_init(  )
-{
-	uint32 i = 0;
-	status rc;
-
-	for( i = 0; static_modules[i]; i ++ ) {
-		rc = static_modules[i]( );
-		if( rc != OK ) {
-			err_log( "static_modules [%d] init failed", i );
-			return ERROR;
-		}
-	}
-	return OK;
-}
-// modules_end ----------------
-static status modules_end(  )
-{
-	serv_end();
-	event_end();
-	perform_end();
-	// static module alloc nothing
 	return OK;
 }
 // do_option -------------

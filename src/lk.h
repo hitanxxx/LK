@@ -38,9 +38,8 @@
 #include "l_perform.h"
 #include "l_webapi.h"
 
-typedef status ( * module_init_pt ) ( void );
-
 status dynamic_module_init( void );
 status dynamic_module_end( void );
+status modules_end( void );
 
 #endif
