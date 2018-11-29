@@ -23,7 +23,7 @@ typedef struct meta_t {
 } meta_t;
 
 status meta_file_alloc( meta_t ** meta, uint32 length );
-status meta_page_alloc( l_mem_page_t * page, meta_t ** out, uint32 size );
+status meta_page_alloc( l_mem_page_t * page, uint32 size, meta_t ** out );
 status meta_page_get_all( l_mem_page_t * page, meta_t * in, meta_t ** out );
 status meta_alloc( meta_t ** meta, uint32 size );
 status meta_free( meta_t * meta );
