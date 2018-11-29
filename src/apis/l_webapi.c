@@ -42,9 +42,8 @@ status api_file_upload( void * data )
 			"Alloc mem page",
 			l_strlen("Alloc mem page") );
 	}
-	if( OK != meta_page_get_all( page,
-	webser->request_body->body_head,
- 	&upload_file_meta ) ) {
+	if( OK != meta_page_get_all( page, webser->request_body->body_head,
+		&upload_file_meta ) ) {
 		err_log("%s --- get body meta failed", __func__ );
 		l_mem_page_free( page );
 		return api_web_response_failed( webser,
@@ -52,8 +51,8 @@ status api_file_upload( void * data )
 			l_strlen("Get body meta") );
 	}
 	debug_log("%s --- upload [%.*s]", __func__,
- 	meta_len( upload_file_meta->pos, upload_file_meta->last ),
- 	upload_file_meta->pos );
+		meta_len( upload_file_meta->pos, upload_file_meta->last ),
+		upload_file_meta->pos );
 	upload_file = open( L_PATH_UOLOAD_FILE, O_CREAT|O_RDWR|O_TRUNC, 0644 );
 	if( upload_file == ERROR ) {
 		err_log("%s --- open file failed", __func__ );
@@ -90,35 +89,47 @@ status api_proxy( void * data )
 	webser_t * webser;
 	meta_t *cl;
 	json_t * json;
-	status rc;
+	status rc = OK;
+	l_mem_page_t * page;
 
 	webser = (webser_t *)data;
-	if( webser->request_body && webser->request_body->body_head ) {
-		if( webser->request_body->body_head->next ) {
-			return api_web_response_failed( webser,
-				"Proxy request too large",
-				l_strlen("Proxy request too large") );
-		}
-		cl = webser->request_body->body_head;
-		if( OK != json_decode( &json, cl->pos, cl->last ) ) {
-			err_log(  "%s --- json decode error", __func__ );
-			return api_web_response_failed( webser,
-				"Json data error",
-				l_strlen("Json data error") );
-		}
-		rc = upstream_start( (void*)webser, json );
-		json_free( json );
-		if( rc == ERROR ) {
-			err_log("%s --- upstream start failed", __func__ );
-			return api_web_response_failed( webser,
-				"Proxy upstream failed",
-				l_strlen("Proxy upstream failed") );
-		}
-		return rc;
+	if( !webser->request_body || !webser->request_body->body_head ) {
+		err_log("%s --- json empty", __func__ );
+		return api_web_response_failed( webser,
+			"Json empty",
+			l_strlen("Json empty") );
 	}
-	return api_web_response_failed( webser,
-		"Json empty",
-		l_strlen("Json empty") );
+	if( OK != l_mem_page_create( &page, 4096 ) ) {
+		err_log("%s --- mem page create", __func__  );
+		return api_web_response_failed( webser,
+			"Alloc mem page",
+			l_strlen("Alloc mem page") );
+	}
+	if( OK != meta_page_get_all( page,
+		webser->request_body->body_head, &cl ) ) {
+		err_log("%s --- meta page get all", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Get body meta",
+			l_strlen("Get body meta") );
+	}
+	if( OK != json_decode( &json, cl->pos, cl->last ) ) {
+		err_log(  "%s --- json decode error", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Json data error",
+			l_strlen("Json data error") );
+	}
+	rc = upstream_start( (void*)webser, json );
+	l_mem_page_free( page );
+	json_free( json );
+	if( rc == ERROR ) {
+		err_log("%s --- upstream start failed", __func__ );
+		return api_web_response_failed( webser,
+			"Proxy upstream failed",
+			l_strlen("Proxy upstream failed") );
+	}
+	return rc;
 }
 // api_perform_info -------------------
 status api_perform_info( void * data )
@@ -233,14 +244,10 @@ static status api_perform_setting_data_check( json_t * json )
 			return ERROR;
 		}
 		// body part
-		if( method.len == l_strlen("XXXX") ) {
-			if( strncmp( method.data, "POST", method.len ) == 0 ||
-			strncmp( method.data, "post", method.len ) ) {
-				if( OK != json_get_child_by_name( t, "body",
-				l_strlen("body"), &v ) ) {
-					err_log("%s --- method post, have't 'body'", __func__ );
-					return ERROR;
-				}
+		if( OK == l_strncmp_cap( method.data, method.len, "POST", l_strlen("POST") ) ) {
+			if( OK != json_get_child_by_name( t, "body", l_strlen("body"), &v ) ) {
+				err_log("%s --- method post, have't 'body'", __func__ );
+				return ERROR;
 			}
 		}
 	}
@@ -250,11 +257,12 @@ static status api_perform_setting_data_check( json_t * json )
 status api_perform_start( void * data )
 {
 	webser_t * webser;
-	meta_t *cl, *t;
-	uint32 length = 0, i = 0, single_body = 0;
+	meta_t *cl;
+	uint32 i = 0;
 	json_t * json;
 	int32 perf_file;
 	ssize_t status;
+	l_mem_page_t * page;
 
 	webser = data;
 	// check perf mode on/off
@@ -272,73 +280,62 @@ status api_perform_start( void * data )
 			l_strlen("Perf is running") );
 	}
 	// get request data
-	if( !webser->request_body->body_head ) {
+	if( !webser->request_body || !webser->request_body->body_head ) {
 		err_log("%s --- have't request body", __func__ );
 		return api_web_response_failed( webser,
-			"Have't request body",
-			l_strlen("Have't request body") );
+			"Json empty",
+			l_strlen("Json empty") );
 	}
-	if( webser->request_body->body_head->next ) {
-		for( cl = webser->request_body->body_head; cl; cl = cl->next ) {
-			length += meta_len( cl->pos, cl->last );
-		}
-		// limit json data length
-		if( length > PERFORM_SETTING_LENGTH ) {
-			err_log("%s --- json data length > PERFORM_SETTING_LENGTH", __func__ );
-			return api_web_response_failed( webser,
-				"Json data too large",
-				l_strlen("Json data too large") );
-		}
-		if( OK != meta_alloc( &t, length ) ) {
-			err_log("%s --- malloc meta for body meta chain", __func__ );
-			return api_web_response_failed( webser,
-				"Alloc body temp meta",
-				l_strlen("Alloc body temp meta") );
-		}
-		for( cl = webser->request_body->body_head; cl; cl = cl->next ) {
-			memcpy( t->last, cl->pos, meta_len( cl->pos, cl->last ) );
-			t->last += meta_len( cl->pos, cl->last );
-		}
-	} else {
-		t = webser->request_body->body_head;
-		single_body = 1;
+	if( OK != l_mem_page_create( &page, 4096 ) ) {
+		err_log("%s --- alloc mem page", __func__ );
+		return api_web_response_failed( webser,
+			"Alloc mem page",
+			l_strlen("Alloc mem page") );
+	}
+	if( OK != meta_page_get_all( page, webser->request_body->body_head, &cl )) {
+		err_log("%s --- get body meta", __func__ );
+		l_mem_page_free( page );
+		return api_web_response_failed( webser,
+			"Get body meta",
+			l_strlen("Get body meta") );
 	}
 	// check request data format
-	if( OK != json_decode( &json, t->pos, t->last ) ) {
-		if( !single_body ) meta_free( t );
+	if( OK != json_decode( &json, cl->pos, cl->last ) ) {
+		l_mem_page_free( page );
 		err_log( "%s --- json decode", __func__ );
 		return api_web_response_failed( webser,
 			"Json data error",
 			l_strlen("Json data error") );
 	}
+	// check json format
 	if( OK != api_perform_setting_data_check( json ) ) {
+		l_mem_page_free( page );
 		json_free( json );
-		if( !single_body ) meta_free( t );
 		err_log("%s --- json data check failed", __func__ );
 		return api_web_response_failed( webser,
 			"Json data error",
 			l_strlen("Json data error") );
 	}
 	json_free( json );
-	// perform setting data save
+	// save json data
 	perf_file = open( L_PATH_PERFTEMP, O_CREAT|O_RDWR|O_TRUNC, 0644 );
 	if( perf_file == ERROR ) {
-		if( !single_body ) meta_free( t );
+		l_mem_page_free( page );
 		err_log("%s --- perf temp file open", __func__ );
 		return api_web_response_failed( webser,
 			"Perf cache file open failed",
 			l_strlen("Perf cache file open failed") );;
 	}
-	status = write( perf_file, t->pos, meta_len( t->pos, t->last ) );
+	status = write( perf_file, cl->pos, meta_len( cl->pos, cl->last ) );
 	if( status == ERROR ) {
-		if( !single_body ) meta_free( t );
+		l_mem_page_free( page );
 		close( perf_file );
 		err_log("%s --- write pid to perf_file", __func__ );
 		return api_web_response_failed( webser,
 			"Perf cache file write failed",
 			l_strlen("Perf cache file write failed") );;
 	}
-	if( !single_body ) meta_free( t );
+	l_mem_page_free( page );
 	close( perf_file );
 	// set signal, prepare goto perform test
 	sig_perf = 1;
