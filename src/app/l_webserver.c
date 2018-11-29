@@ -500,8 +500,7 @@ static status webser_entity_start ( webser_t * webser )
 	char * ptr;
 	uint32 length;
 
-	if( webser->request_head->method.len != l_strlen("GET") ||
- 	strncmp( webser->request_head->method.data, "GET", l_strlen("GET") )!= 0 ) {
+	if( OK != l_strncmp_cap( webser->request_head->method.data, webser->request_head->method.len, "GET", l_strlen("GET") ) ) {
 		err_log("%s --- method not 'GET'", __func__ );
 		webser->re_status = 400;
 		return OK;
