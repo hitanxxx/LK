@@ -14,13 +14,9 @@ static status http_request_head_set_connection( http_request_head_t * request,
 
 static struct header_t headers[] = {
 	{ 	string("Host"),				http_request_head_set_value,offsetof(request_headers_in_t, host) },
-	{ 	string("host"),				http_request_head_set_value,offsetof(request_headers_in_t, host) },
-	{ 	string("content-length"),	http_request_head_set_value,offsetof(request_headers_in_t, content_length) },
 	{ 	string("Content-Length"),	http_request_head_set_value,offsetof(request_headers_in_t, content_length) },
 	{ 	string("Connection"),		http_request_head_set_connection,offsetof(request_headers_in_t,	connection)	},
-	{ 	string("connection"),		http_request_head_set_connection,offsetof(request_headers_in_t,	connection)	},
 	{ 	string("Transfer-Encoding"),http_request_head_set_value,offsetof(request_headers_in_t,	transfer_encoding)	},
-	{ 	string("transfer-encoding"),http_request_head_set_value,offsetof(request_headers_in_t,	transfer_encoding)	},
 	{   string("User-Agent"),		http_request_head_set_value,offsetof(request_headers_in_t,	user_agent) }
 };
 
@@ -54,8 +50,7 @@ static status http_request_head_find_header( string_t * str,
 	for( i = 0; i < (int32)(sizeof(headers)/sizeof(struct header_t));
 	 i ++ ) {
 		if( headers[i].name.len == str->len ) {
-			if( strncmp( headers[i].name.data, str->data,
-				 str->len ) == 0 ) {
+			if( OK == l_strncmp_cap( headers[i].name.data, headers[i].name.len, str->data, str->len ) ) {
 				*header = &headers[i];
 				return OK;
 			}
@@ -138,12 +133,9 @@ static status http_request_head_parse_request_line( http_request_head_t * reques
 							err_log( "%s --- method length less than 1", __func__ );
 							return ERROR;
 						}
-						if( request->method.len == l_strlen("CONNECT") ) {
-							if( strncmp( request->method.data, "CONNECT", request->method.len ) == 0 ) {
-								//request->https = 1;
-								state = s_after_connect;
-								break;
-							}
+						if( OK == l_strncmp_cap( request->method.data, request->method.len, "CONNECT", l_strlen("CONNECT") ) ) {
+							state = s_after_connect;
+							break;
 						}
 						state = s_after_method;
 					}
@@ -457,11 +449,9 @@ static status http_request_head_process_headers( http_request_head_t * request )
 				user_agent.data = request->headers_in.user_agent->data;
 			}
 			access_log("%.*s - %s - %.*s",
-			meta_len(c->meta->start, request->request_line_end ),
-			c->meta->start,
+			meta_len( request->request_line_start, request->request_line_end ), request->request_line_start,
 			inet_ntoa( request->c->addr.sin_addr ),
-			user_agent.len,
-		 	user_agent.data );
+			user_agent.len, user_agent.data );
 
 			if( request->headers_in.content_length ) {
 				request->body_type = HTTP_ENTITYBODY_CONTENT;

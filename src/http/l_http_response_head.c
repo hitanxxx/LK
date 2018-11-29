@@ -267,9 +267,9 @@ static status http_response_head_process_headers( http_response_head_t * respons
 	int32 rc = AGAIN;
 	string_t * key, * value;
 	int32 length;
-	uint32 content_str_length = l_strlen("Content-Length");
-	uint32 transfer_str_length = l_strlen("Transfer-Encoding");
-	uint32 connection_str_length = l_strlen("Connection");
+	string_t content_str_length = string("Content-Length");
+	string_t transfer_str_length = string("Transfer-Encoding");
+	string_t connection_str_length = string("Connection");
 
 	while(1) {
 		if( rc == AGAIN ) {
@@ -285,32 +285,21 @@ static status http_response_head_process_headers( http_response_head_t * respons
 		if( rc == OK ) {
 			key = &response->header_key;
 			value = &response->header_value;
-			if( key->len == connection_str_length ) {
-				if( strncmp( key->data, "Connection", key->len ) == 0 ||
-					strncmp( key->data, "connection", key->len ) == 0
-				) {
-					if( value->len > (int32)strlen("close") ) {
-						response->keepalive = 1;
-					} else {
-						response->keepalive = 0;
-					}
+			if( OK == l_strncmp_cap( key->data, key->len, connection_str_length.data, connection_str_length.len ) ) {
+				if( value->len > l_strlen("close") ) {
+					response->keepalive = 1;
+				} else {
+					response->keepalive = 0;
 				}
-			} else if( key->len == content_str_length ) {
-				if( strncmp( key->data, "Content-Length", key->len ) == 0 ||
-					strncmp( key->data, "content-length", key->len ) == 0
-				) {
-					response->body_type = HTTP_ENTITYBODY_CONTENT;
-					if( OK != l_atoi( value->data, value->len, &length ) ){
-						err_log( "%s --- l_atoi content length", __func__ );
-						return ERROR;
-					}
-					response->content_length = (uint32)length;
+			} else if( OK == l_strncmp_cap( key->data, key->len, content_str_length.data, content_str_length.len ) ) {
+				response->body_type = HTTP_ENTITYBODY_CONTENT;
+				if( OK != l_atoi( value->data, value->len, &length ) ){
+					err_log( "%s --- l_atoi content length", __func__ );
+					return ERROR;
 				}
-			} else if ( key->len == transfer_str_length ) {
-				if( strncmp( key->data, "Transfer-Encoding", key->len ) == 0 ||
-			 		strncmp( key->data, "transfer-encoding", key->len ) == 0) {
-					response->body_type = HTTP_ENTITYBODY_CHUNK;
-				}
+				response->content_length = (uint32)length;
+			} else if( OK == l_strncmp_cap( key->data, key->len, transfer_str_length.data, transfer_str_length.len ) ) {
+				response->body_type = HTTP_ENTITYBODY_CHUNK;
 			}
 			continue;
 		} else  if( rc == HTTP_PARSE_HEADER_DONE ) {
