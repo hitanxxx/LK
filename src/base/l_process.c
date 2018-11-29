@@ -31,6 +31,7 @@ static void process_worker_end( void )
 {
 	err_log( "%s --- worker process exiting", __func__ );
 	dynamic_module_end( );
+	modules_end();
 	exit(0);
 }
 // process_worker_run -------------------
@@ -164,6 +165,7 @@ void process_single_run( void )
 	dynamic_module_init( );
 	while( 1 ) {
 		if( sig_quit ) {
+			sig_quit = 0;
 			dynamic_module_end();
 			break;
 		}
