@@ -292,3 +292,26 @@ status l_hex2dec( char * str, uint32 length, int32 * num )
 	*num = minus ? ( 0 - rc ) : rc;
 	return OK;
 }
+// l_strncmp_cap ---------
+status l_strncmp_cap( char * src, uint32 src_length, char * dst, uint32 dst_length )
+{
+	uint32 i = 0;
+
+	if( src_length != dst_length ) {
+		return ERROR;
+	}
+	for( i = 0; i < dst_length; i ++ ) {
+		if( (src[i] >= 'a' && src[i] <= 'z') || (src[i] >= 'A' && src[i] <= 'Z') ) {
+			if( (32 == l_abs( src[i] - dst[i] ) ) || src[i] == dst[i] ) {
+				continue;
+			} else {
+				return ERROR;
+			}
+		} else {
+			if( src[i] != dst[i] ) {
+				return ERROR;
+			}
+		}
+	}
+	return OK;
+}

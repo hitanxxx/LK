@@ -14,5 +14,6 @@ char * l_find_str( char * str, uint32 str_len, char * find, uint32 find_len );
 status l_atoi( char * str, uint32 length, int32 * num );
 status l_atof( char * str, uint32 length, float * num );
 status l_hex2dec( char * str, uint32 length, int32 * num );
+status l_strncmp_cap( char * src, uint32 src_length, char * dst, uint32 dst_length );
 
 #endif
