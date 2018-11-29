@@ -4,7 +4,6 @@
 #define UP_TIMEOUT 5
 
 typedef struct upstream_send_t {
-
 	string_t  		host;
 	string_t  		uri;
 	meta_t*			body;
@@ -15,6 +14,7 @@ typedef status (* upstream_handler )( upstream_t * );
 typedef struct upstream_t {
 	connection_t * 				upstream;
 	connection_t * 				downstream;
+	l_mem_page_t *				page;
 
 	struct sockaddr_in			up_addr;
 	upstream_send_t				upstream_send;
