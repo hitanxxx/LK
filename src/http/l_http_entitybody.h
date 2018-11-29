@@ -21,12 +21,12 @@ struct http_entitybody_t {
 	// content infos
 	uint32				content_length;
 	ssize_t				content_need;
-	char *				content_end;
+	//char *				content_end;
 	// chunked infos
-	char *				chunk_pos;
 	uint32 				chunk_length;
 	uint32				chunk_recvd;
 	uint32	 			chunk_need;
+	char *				chunk_pos;
 	uint32				chunk_all_length;
 
 	char				hex_str[ENTITY_BODY_CHUNKED_PART_HEX_STR_LENGTH];

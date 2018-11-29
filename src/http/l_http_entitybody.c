@@ -4,38 +4,8 @@ static queue_t usable;
 static queue_t in_use;
 static http_entitybody_t * pool = NULL;
 
-// http_entitybody_recv ------------------------------------------
-static ssize_t http_entitybody_recv( http_entitybody_t * bd )
-{
-	ssize_t rc;
-
-	if ( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-		if( bd->body_last->last - bd->chunk_pos > 0 ) {
-			debug_log("%s --- chunk already have", __func__ );
-			return OK;
-		}
-	}
-	rc = bd->c->recv( bd->c, bd->body_last->last,
-		meta_len( bd->body_last->last, bd->body_last->end ) );
-	if( rc == ERROR ) {
-		err_log(  "%s --- recv", __func__ );
-		return ERROR;
-	} else if ( rc == AGAIN ) {
-		debug_log("%s --- again", __func__ );
-		return AGAIN;
-	} else {
-		if( bd->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			bd->content_need -= rc;
-		} else if( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-			bd->chunk_all_length += (uint32)rc;
-		}
-		debug_log("%s --- recv [%d]", __func__, rc );
-		bd->body_last->last += rc;
-		return rc;
-	}
-}
-// http_entitybody_decode_chunk -----------------------------------------------
-static status http_entitybody_decode_chunk( http_entitybody_t * bd )
+// http_entity_parse_chunk -----------------------------------------------
+static status http_entity_parse_chunk( http_entitybody_t * bd )
 {
 	status rc = AGAIN;
 	char * p;
@@ -43,34 +13,32 @@ static status http_entitybody_decode_chunk( http_entitybody_t * bd )
 	int32  length;
 
 	enum {
-		entity_body_state_start = 0,
-		entity_body_hex,
-		entity_body_hex_rn,
-		entity_body_part,
-		entity_body_part_r,
-		entity_body_part_rn,
-		entity_body_last_r,
-		entity_body_last_rn
+		chunk_start = 0,
+		chunk_hex,
+		chunk_hex_rn,
+		chunk_part,
+		chunk_part_r,
+		chunk_part_rn,
+		chunk_last_r,
+		chunk_last_rn
 	} state;
-
 	state = bd->state;
 	for( p = bd->chunk_pos; p < bd->body_last->last; p ++ ) {
-		if( state == entity_body_state_start ) {
+		if( state == chunk_start ) {
 			if(
 			( *p >= '0' && *p <= '9' ) ||
 			( *p >= 'a' && *p <= 'f' ) ||
 			( *p >= 'A' && *p <= 'F' )
 			) {
-				bd->hex_str[bd->hex_length] = *p;
-				bd->hex_length ++;
-				state = entity_body_hex;
+				bd->hex_str[bd->hex_length++] = *p;
+				state = chunk_hex;
 				continue;
 			} else {
-				err_log(  "%s --- start illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_start illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
 		}
-		if ( state == entity_body_hex ) {
+		if ( state == chunk_hex ) {
 			if(
 			( *p >= '0' && *p <= '9' ) ||
 			( *p >= 'a' && *p <= 'f' ) ||
@@ -80,84 +48,81 @@ static status http_entitybody_decode_chunk( http_entitybody_t * bd )
 			(*p == '\r' )
 			) {
 				if( *p == '\r' ) {
-					state = entity_body_hex_rn;
+					state = chunk_hex_rn;
 				} else {
-					bd->hex_str[bd->hex_length] = *p;
-					bd->hex_length++;
+					bd->hex_str[bd->hex_length++] = *p;
 				}
 				continue;
 			} else {
-				err_log(  "%s --- num illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_hex illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
 		}
-		if ( state == entity_body_hex_rn ) {
+		if ( state == chunk_hex_rn ) {
 			if( *p != '\n' ) {
-				err_log(  "%s --- num_rn illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_hex_rn illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
-			if( OK != l_hex2dec( bd->hex_str, bd->hex_length,
-			&length ) ) {
-				err_log("%s --- hex2dec [%.*s]", __func__,
+			if( OK != l_hex2dec( bd->hex_str, bd->hex_length, &length ) ) {
+				err_log("%s --- chunk partnum hex2dec failed, [%.*s]", __func__,
 				bd->hex_length, bd->hex_str );
 				return ERROR;
 			}
 			bd->hex_length = 0;
 			bd->chunk_length = (uint32)length;
 			if( bd->chunk_length == 0 ) {
-				state = entity_body_last_r;
+				state = chunk_last_r;
 				continue;
 			} else {
 				bd->chunk_recvd = 0;
 				bd->chunk_need = bd->chunk_length;
-				state = entity_body_part;
+				state = chunk_part;
 				continue;
 			}
 		}
-		if ( state == entity_body_part ) {
+		if ( state == chunk_part ) {
 			recvd = meta_len( p, bd->body_last->last );
 			if( recvd >= bd->chunk_need ) {
 				p += bd->chunk_need;
-				state = entity_body_part_r;
+				state = chunk_part_r;
 			} else {
 				bd->chunk_recvd += recvd;
 				bd->chunk_need -= recvd;
-
 				p = bd->body_last->last;
-				state = entity_body_part;
+				state = chunk_part;
 				break;
 			}
 		}
-		if( state == entity_body_part_r ) {
+		if( state == chunk_part_r ) {
 			if( *p != '\r' ) {
-				err_log(  "%s --- part_r illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_part_r illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
-			state = entity_body_part_rn;
+			state = chunk_part_rn;
 			continue;
 		}
-		if( state == entity_body_part_rn ) {
+		if( state == chunk_part_rn ) {
 			if( *p != '\n' ) {
-				err_log(  "%s --- part_rn illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_part_rn illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
-			state = entity_body_state_start;
+			state = chunk_start;
 			continue;
 		}
-		if( state == entity_body_last_r ) {
+		if( state == chunk_last_r ) {
 			if( *p != '\r' ) {
-				err_log(  "%s --- last r illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_last_r illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
-			state = entity_body_last_rn;
+			state = chunk_last_rn;
 			continue;
 		}
-		if ( state == entity_body_last_rn ) {
+		if ( state == chunk_last_rn ) {
 			if( *p != '\n' ) {
-				err_log(  "%s --- last rn illegal, [%d]", __func__, *p );
+				err_log(  "%s --- chunk_last_rn illegal, [%d]", __func__, *p );
 				return ERROR;
 			}
-			state = entity_body_state_start;
+			state = chunk_start;
 			p++;
 			rc = DONE;
 			break;
@@ -167,33 +132,20 @@ static status http_entitybody_decode_chunk( http_entitybody_t * bd )
 	bd->state = state;
 	return rc;
 }
-// http_entitybody_decode_content -----------
-static status http_entitybody_decode_content( http_entitybody_t * bd )
+// http_entity_process_content --------
+static status http_entity_process_content( http_entitybody_t * bd )
 {
-	if( bd->content_need <= 0 ) {
-		if( bd->content_need < 0 ) {
-			bd->content_end = bd->body_last->last + bd->content_need;
-		} else {
-			bd->content_end = bd->body_last->last;
-		}
-		return DONE;
-	}
-	return AGAIN;
-}
-// http_entitybody_process -----------
-static status http_entitybody_process( http_entitybody_t * bd )
-{
+	meta_t * new;
 	ssize_t rc;
-	meta_t * new = NULL;
-
-	while(1) {
-		if( ( bd->cache && !bd->body_last ) ||
-		bd->body_last->last == bd->body_last->end ) {
-			if( !bd->cache ) {
+	while ( 1 ) {
+		if( !bd->cache ) {
+			if( bd->body_last->last == bd->body_last->end ) {
 				bd->body_last->last = bd->body_last->pos;
-			} else {
+			}
+		} else {
+			if( ( !bd->body_last ) || ( bd->body_last->last == bd->body_last->end ) ) {
 				if( OK != meta_alloc( &new, ENTITY_BODY_BUFFER_SIZE ) ) {
-					err_log( "%s --- alloc new meta", __func__ );
+					err_log("%s --- alloc meta new", __func__ );
 					return ERROR;
 				}
 				if( !bd->body_last ) {
@@ -204,74 +156,142 @@ static status http_entitybody_process( http_entitybody_t * bd )
 					bd->body_last = bd->body_last->next;
 				}
 			}
-			if( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-				bd->chunk_pos = bd->body_last->pos;
-			}
 		}
-		rc = http_entitybody_recv( bd );
+		rc = bd->c->recv( bd->c, bd->body_last->last, meta_len( bd->body_last->last, bd->body_last->end ) );
 		if( rc == ERROR ) {
+			err_log("%s --- recv failed, [%d]", __func__, errno );
 			return ERROR;
 		} else if ( rc == AGAIN ) {
 			return AGAIN;
-		}
-		if( bd->body_type == HTTP_ENTITYBODY_CONTENT ) {
-			rc = http_entitybody_decode_content( bd );
-		} else if ( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-			rc = http_entitybody_decode_chunk( bd );
-		}
-		if( rc == ERROR )  {
-			return ERROR;
-		} else if ( rc == DONE ) {
-			debug_log("%s --- success", __func__ );
-			if( bd->body_type == HTTP_ENTITYBODY_CONTENT ) {
+		} else {
+			bd->body_last->last += rc;
+			bd->content_need -= rc;
+			if( !bd->content_need ) {
 				bd->all_length = bd->content_length;
-			} else if ( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-				bd->all_length = bd->chunk_all_length;
+				return DONE;
 			}
+		}
+	}
+}
+// http_entity_process_chunk -------
+static status http_entity_process_chunk( http_entitybody_t * bd )
+{
+	ssize_t rc;
+	meta_t * new;
+	while( 1 ) {
+		if( !bd->cache ) {
+			if( bd->body_last->last == bd->body_last->end ) {
+				bd->body_last->last = bd->body_last->pos;
+				bd->chunk_pos = bd->body_last->pos;
+			}
+		} else {
+			if( ( !bd->body_last ) || ( bd->body_last->last == bd->body_last->end )  ) {
+				if( OK != meta_alloc( &new, ENTITY_BODY_BUFFER_SIZE ) ) {
+					err_log("%s --- alloc meta new", __func__ );
+					return ERROR;
+				}
+				if( !bd->body_last ) {
+					bd->body_last = new;
+					bd->body_head = bd->body_last;
+				} else {
+					bd->body_last->next = new;
+					bd->body_last = bd->body_last->next;
+				}
+				bd->chunk_pos = bd->body_last->pos;
+			}
+		}
+		if( bd->chunk_pos == bd->body_last->last ) {
+			rc = bd->c->recv( bd->c, bd->body_last->last, meta_len( bd->body_last->last, bd->body_last->end ) );
+			if( rc == ERROR ) {
+				err_log("%s --- recv failed, [%d]", __func__, errno );
+				return ERROR;
+			} else if ( rc == AGAIN ) {
+				return AGAIN;
+			} else {
+				bd->body_last->last += rc;
+			}
+		}
+		rc = http_entity_parse_chunk( bd );
+		if( rc == DONE ) {
 			return DONE;
+		} else if ( rc == ERROR ) {
+			err_log("%s --- parse chunk failed", __func__ );
+			return ERROR;
 		}
 	}
 }
 // http_entitybody_start ------
 static status http_entitybody_start( http_entitybody_t * bd )
 {
-	uint32 length, alloc_length;
+	uint32 busy_head = 0;
+	meta_t * new;
 
-	length = meta_len( bd->c->meta->pos, bd->c->meta->last );
-	alloc_length = ( length < ENTITY_BODY_BUFFER_SIZE ) ?
-						ENTITY_BODY_BUFFER_SIZE : length;
-	if( OK != meta_alloc( &bd->body_last, alloc_length ) ) {
-		err_log("%s --- body_last meta alloc", __func__ );
-		return ERROR;
-	}
-	bd->body_head = bd->body_last;
+	busy_head = meta_len( bd->c->meta->pos, bd->c->meta->last );
 	if( bd->body_type == HTTP_ENTITYBODY_CONTENT ) {
-		bd->content_need = (ssize_t)bd->content_length;
-		if( length ) {
-			if( bd->cache ) {
-				memcpy( bd->body_last->last, bd->c->meta->pos, length );
-				bd->body_last->last += length;
-			}
-			bd->content_need -= (ssize_t)length;
-		}
-		if( bd->content_need <= 0 ) {
-			if( bd->content_need < 0 ) {
-				bd->content_end = bd->body_last->last + bd->content_need;
-			} else {
-				bd->content_end = bd->body_last->last;
-			}
+		bd->content_need = bd->content_length;
+		if( busy_head == bd->content_need ) {
+			// if busy contain all body
+			bd->content_need -= busy_head;
 			bd->all_length = bd->content_length;
-			return DONE;
+			if( !bd->cache ) {
+				return DONE;
+			} else {
+				if( OK != meta_alloc( &bd->body_head, busy_head ) ) {
+					err_log("%s --- alloc body head", __func__ );
+					return ERROR;
+				}
+				bd->body_last = bd->body_head;
+				l_memcpy( bd->body_last->last, bd->c->meta->pos, busy_head );
+				bd->body_last->last += busy_head;
+				return DONE;
+			}
+		} else if ( busy_head < bd->content_need ) {
+			if( !bd->cache ) {
+				if( OK != meta_alloc( &bd->body_head, ENTITY_BODY_BUFFER_SIZE ) ) {
+					err_log("%s --- alloc body head", __func__ );
+					return ERROR;
+				}
+				bd->body_last = bd->body_head;
+			} else {
+				if( OK != meta_alloc( &bd->body_head, busy_head ) ) {
+					err_log("%s --- alloc body head", __func__ );
+					return ERROR;
+				}
+				bd->body_last = bd->body_head;
+				l_memcpy( bd->body_last->last, bd->c->meta->pos, busy_head );
+				bd->body_last->last += busy_head;
+			}
+			bd->content_need -= busy_head;
+			bd->handler = http_entity_process_content;
+			return bd->handler( bd );
+		} else {
+			err_log("%s --- busy head more than content length...", __func__ );
+			return ERROR;
 		}
 	} else if( bd->body_type == HTTP_ENTITYBODY_CHUNK ) {
-		if( length ) {
-			memcpy( bd->body_last->last, bd->c->meta->pos, length );
-			bd->body_last->last += length;
+		// make frist meta not full
+		if( busy_head ) {
+			if( OK != meta_alloc( &bd->body_head, busy_head + ENTITY_BODY_BUFFER_SIZE ) ) {
+				err_log("%s --- alloc body head", __func__ );
+				return ERROR;
+			}
+			bd->body_last = bd->body_head;
+
+			l_memcpy( bd->body_last->last, bd->c->meta->pos, busy_head );
+			bd->body_last->last += busy_head;
+		} else {
+			if( OK != meta_alloc( &bd->body_head, ENTITY_BODY_BUFFER_SIZE ) ) {
+				err_log("%s --- alloc body head", __func__ );
+				return ERROR;
+			}
+			bd->body_last = bd->body_head;
 		}
 		bd->chunk_pos = bd->body_last->pos;
+		bd->handler = http_entity_process_chunk;
+		return bd->handler( bd );
 	}
-	bd->handler = http_entitybody_process;
-	return bd->handler ( bd );
+	err_log("%s --- not support entity body type", __func__ );
+	return ERROR;
 }
 //http_entitybody_alloc -----------
 static status http_entitybody_alloc( http_entitybody_t ** body )
@@ -321,7 +341,7 @@ status http_entitybody_free( http_entitybody_t * bd )
 
 	bd->content_length = 0;
 	bd->content_need = 0;
-	bd->content_end = NULL;
+	//bd->content_end = NULL;
 
 	bd->chunk_pos = NULL;
 	bd->chunk_length = 0;
