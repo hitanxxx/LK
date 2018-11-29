@@ -1,7 +1,7 @@
 # LK
 
 # Introduce
-LK 是ANSI C的一个web框架。除OpenSSL，未使用任意第三方库，事件通知使用linux下的epoll，目前只能在linux下使用。定时器采用数组最小堆。包含3个功能模块：
+lk是c写的一个基本的网络框架，除OpenSSL之外，不依赖任何库。包含一些功能模块：
 ## LK-PERF
 lk-perf 固定数量进程（非大量fork），事件驱动， 无锁，数据可视化的高性能，web应用性能测试模块。</br>
 UI用echarts js实现初略的数据可视化。通过UI可以方便的设置测试用例，通过图表直观的进行数据对比。
@@ -33,7 +33,7 @@ lk的功能模块需要OpenSSL库。解决依赖后。在文件目录运行：
 stop all process when works in the backend
 * -reload </br>
 作用是重新启动子进程
-reload all worker process 
+reload all worker process
 
 # configuraction
 ```json
