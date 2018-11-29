@@ -26,15 +26,26 @@ typedef struct json_content_t {
 	char * end;
 } json_content_t;
 
+// get
+status json_get_child( json_t * parent, uint32 index, json_t ** child );
 status json_get_obj_str( json_t * obj, char * str, uint32 length, json_t ** child );
 status json_get_obj_bool( json_t * obj, char * str, uint32 length, json_t ** child );
 status json_get_obj_num( json_t * obj, char * str, uint32 length, json_t ** child );
 status json_get_obj_null( json_t * obj, char * str, uint32 length, json_t ** child );
 status json_get_obj_arr( json_t * obj, char * str, uint32 length, json_t ** child );
 status json_get_obj_obj( json_t * obj, char * str, uint32 length, json_t ** child );
-
-status json_get_child( json_t * parent, uint32 index, json_t ** child );
 status json_get_child_by_name( json_t * parent, char * str, uint32 length, json_t ** child );
+
+// add
+json_t * json_add_obj( json_t * parent );
+json_t * json_add_arr( json_t * parent );
+json_t * json_add_true( json_t * parent );
+json_t * json_add_false( json_t * parent );
+json_t * json_add_null( json_t * parent );
+json_t * json_add_str( json_t * parent, char* str, uint32 length );
+json_t * json_add_num( json_t * parent, uint32 num );
+json_t * json_obj_add_child( json_t * parent, char * str, uint32 length );
+
 
 status json_decode( json_t ** json, char * p, char * end );
 status json_encode( json_t * json, meta_t ** string );
