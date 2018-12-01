@@ -13,8 +13,7 @@ typedef struct process_t {
 	int32			exiting;
 	int32			exited;
 } process_t ;
-
-extern process_t process_arr[MAXPROCESS];
+extern process_t *	process_arr;
 
 process_t * process_get_run( void );
 void process_master_run( void );

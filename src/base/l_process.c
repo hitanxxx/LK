@@ -1,6 +1,7 @@
 #include "lk.h"
 
-process_t 	process_arr[MAXPROCESS];
+l_shm_t		shm_process;
+process_t* 	process_arr;
 uint32		process_num = 0;
 uint32		process_id = 0xffff;
 
@@ -186,15 +187,26 @@ status process_init( void )
 {
 	uint32 i;
 
-	memset( process_arr, 0, sizeof(process_arr) );
-	for( i = 0; i < conf.worker_process; i ++ ) {
+	memset( &shm_process, 0, sizeof(l_shm_t) );
+	shm_process.size = sizeof(process_t)*MAXPROCESS;
+	if( OK != l_shm_alloc( &shm_process, shm_process.size ) ) {
+		err_log("%s --- l_shm_alloc failed", __func__ );
+		return ERROR;
+	}
+	process_arr = (process_t*)shm_process.data;
+
+	process_num = conf.worker_process;
+	for( i = 0; i < process_num; i ++ ) {
 		process_arr[i].nid = i;
 	}
-	process_num = conf.worker_process;
 	return OK;
 }
 // process_end -----------------------
 status process_end( void )
 {
+	if( shm_process.size ) {
+		l_shm_free( &shm_process );
+	}
+	shm_process.size = 0;
 	return OK;
 }

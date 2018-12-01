@@ -341,7 +341,8 @@ status api_perform_start( void * data )
 	sig_perf = 1;
 	if( process_id != 0xffff ) {
 		// if have worker process
-		for( i = 0; i < process_id; i ++ ) {
+		for( i = 0; i < process_num; i ++ ) {
+			if( i == process_id ) continue;
 			if( ERROR == kill( process_arr[i].pid, SIGUSR1 ) ) {
 				err_log( "%s --- kill perf signal, [%d]", __func__, errno );
 				return api_web_response_failed( webser,
@@ -373,7 +374,8 @@ status api_perform_stop( void * data )
 	}
 	sig_perf_stop = 1;
 	if( process_id != 0xffff ) {
-		for( i = 0; i < process_id; i ++ ) {
+		for( i = 0; i < process_num; i ++ ) {
+			if( i == process_id ) continue;
 			if( ERROR == kill( process_arr[i].pid, SIGUSR2 ) ) {
 				err_log( "%s --- kill perf stop signal, [%d]", __func__, signal );
 				return api_web_response_failed( webser,

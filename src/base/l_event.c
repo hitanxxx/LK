@@ -10,6 +10,7 @@ static uint32		accept_mutex_open = 0;
 static uint32		accept_event_open = 0;
 sem_t*				accept_mutex = NULL;
 pid_t				accept_mutex_user = 0;
+l_shm_t				shm_event;
 
 // event_connect ---------------
 status event_connect( event_t * event )
@@ -320,25 +321,6 @@ status event_process_init( void )
 		err_log( "%s --- epoll create1", __func__ );
 		return ERROR;
 	}
-
-	if( conf.perf_switch ) {
-		if( process_id == 0xffff || ( process_id == process_num - 1 ) ) {
-			for( i = 0; i < listens->elem_num; i ++ ) {
-				listen_head = mem_list_get( listens, i+1 );
-				if( OK != net_alloc( &c ) ) {
-					err_log( "%s --- net alloc", __func__ );
-					return ERROR;
-				}
-				c->fd = listen_head->fd;
-				c->read->f_accept = 1;
-				c->read->handler = event_accept;
-				c->data = listen_head;
-				listen_head->c = c;
-				event_opt( listen_head->c->read, EVENT_READ );
-			}
-		}
-		return OK;
-	}
 	for( i = 0; i < listens->elem_num; i ++ ) {
 		listen_head = mem_list_get( listens, i+1 );
 		if( conf.reuse_port && process_num > 1 ) {
@@ -386,15 +368,15 @@ status event_process_end( void )
 // event_init -----------------
 status event_init( void )
 {
-	if( !conf.perf_switch && conf.accept_mutex &&
-		!conf.reuse_port && process_num > 1 ) {
+	memset( &shm_event, 0, sizeof(l_shm_t) );
+	if( conf.accept_mutex && !conf.reuse_port && process_num > 1 ) {
 		accept_mutex_open = 1;
-		accept_mutex = (sem_t*) mmap(NULL, sizeof(sem_t), PROT_READ|PROT_WRITE,
-		MAP_ANON|MAP_SHARED, -1, 0);
-		if( accept_mutex == MAP_FAILED ) {
-			err_log("%s --- mmap shm failed, [%d]", __func__, errno );
+		shm_event.size = sizeof(sem_t);
+		if( OK != l_shm_alloc( &shm_event, shm_event.size ) ) {
+			err_log("%s --- l_shm_alloc failed", __func__ );
 			return ERROR;
 		}
+		accept_mutex = (sem_t*)shm_event.data;
 		sem_init( accept_mutex, 1, 1 );
 	}
 	return OK;
@@ -404,7 +386,7 @@ status event_end( void )
 {
 	if( accept_mutex_open ) {
 		sem_destroy( accept_mutex );
-		munmap((void *) accept_mutex, sizeof(sem_t) );
+		l_shm_free( &shm_event );
 	}
 	accept_mutex_open = 0;
 	return OK;

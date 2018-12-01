@@ -6,9 +6,7 @@ static perform_t*			pool = NULL;
 static perform_setting_t 	perf_settings;
 static l_atomic_t single_process_count_arr[PERFORM_MAX_PIPE] = {0};
 static perform_count_t		perf_count;
-
-static uint32	shm_length = 0;
-static char * 	shm_ptr = NULL;
+l_shm_t						shm_perf;
 
 static status performance_setting_end( void );
 static status perf_prepare( perform_t ** p );
@@ -1040,13 +1038,13 @@ status perform_init( void )
 		perf_count.perform_5xx = &single_process_count_arr[9];
 		return OK;
 	}
-	shm_length += (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );
-	shm_ptr = (char*) mmap(NULL, shm_length, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
-	if( shm_ptr == MAP_FAILED ) {
-		err_log("%s --- mmap shm failed, [%d]", __func__, errno );
+	memset( &shm_perf, 0, sizeof(l_shm_t) );
+	shm_perf.size = (uint32)( sizeof(l_atomic_t) * PERFORM_MAX_PIPE * ( 4 + 6 ) );
+	if( OK != l_shm_alloc( &shm_perf, shm_perf.size ) ) {
+		err_log("%s --- l_shm_alloc failed", __func__ );
 		return ERROR;
 	}
-	perf_count.perform_success = (l_atomic_t*)( shm_ptr );
+	perf_count.perform_success = (l_atomic_t*)( shm_perf.data );
 	perf_count.perform_failed = (l_atomic_t*) ( perf_count.perform_success + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
 	perf_count.perform_recvs = (l_atomic_t*) ( perf_count.perform_failed + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
 	perf_count.perform_sends = (l_atomic_t*) ( perf_count.perform_recvs + (sizeof(l_atomic_t) * PERFORM_MAX_PIPE) );
@@ -1061,9 +1059,9 @@ status perform_init( void )
 // perform_end --------------
 status perform_end( void )
 {
-	if( shm_ptr ) {
-		munmap((void *) shm_ptr, shm_length );
+	if( shm_perf.size ) {
+		l_shm_free( &shm_perf );
 	}
-	shm_ptr = NULL;
+	shm_perf.size = 0;
 	return OK;
 }
