@@ -13,6 +13,7 @@ src/apis \
 DEPS="src/lk_global.h \
 src/lk.h \
 src/base/l_mem.h \
+src/base/l_shm.h \
 src/base/l_config.h \
 src/base/l_time.h \
 src/base/l_string.h \
@@ -50,6 +51,7 @@ src/util/l_bheap.h \
 
 SRCS="src/lk.c \
 src/base/l_mem.c \
+src/base/l_shm.c \
 src/base/l_time.c \
 src/base/l_string.c \
 src/base/l_meta.c \

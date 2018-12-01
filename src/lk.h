@@ -4,6 +4,7 @@
 #include "lk_global.h"
 #include "l_test.h"
 
+#include "l_shm.h"
 #include "l_mem.h"
 #include "l_bst.h"
 #include "l_bheap.h"
