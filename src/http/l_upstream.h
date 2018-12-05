@@ -26,6 +26,6 @@ typedef struct upstream_t {
 
 status upstream_alloc( upstream_t ** up );
 status upstream_free( upstream_t * up );
-status upstream_start( void * data, json_t * json );
+status upstream_start( void * data, json_node_t * json );
 
 #endif

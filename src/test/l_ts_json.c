@@ -4,156 +4,216 @@
 static void json_test_empty ( void  )
 {
 	status rc;
-	json_t * json;
+	json_ctx_t * ctx;
 	string_t string = string("");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == ERROR );
+
+	rc = json_ctx_free( ctx );
+	t_assert( rc == OK );
 }
 // ---------------------
 static void json_test_num_integer ( void  )
 {
 	status rc;
-	json_t * json, *num;
+	json_ctx_t *ctx;
+	json_node_t *num;
 	string_t string = string(" 1234 ");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &num );
+		json_get_child( &ctx->root, 1, &num );
 		t_assert( num->type == JSON_NUM );
 		t_assert( num->num == 1234 );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
+
+
 }
 // ---------------------
 static void json_test_num_decimal ( void  )
 {
 	status rc;
-	json_t * json, *num;
+	json_ctx_t * ctx;
+	json_node_t *num;
 	string_t string = string(" 0.123 ");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &num );
+		json_get_child( &ctx->root, 1, &num );
 		t_assert( num->type == JSON_NUM );
 		t_assert( num->num == 0.123 );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_num_minus_integer ( void  )
 {
 	status rc;
-	json_t * json, *num;
+	json_ctx_t * ctx;
+	json_node_t *num;
 	string_t string = string("  -1234 ");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &num );
+		json_get_child( &ctx->root, 1, &num );
 		t_assert( num->type == JSON_NUM );
 		t_assert( num->num == -1234 );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_num_minus_decimal ( void  )
 {
 	status rc;
-	json_t * json, *num;
+	json_ctx_t *ctx;
+	json_node_t *num;
 	string_t string = string("  -0.123 ");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &num );
+		json_get_child( &ctx->root, 1, &num );
 		t_assert( num->type == JSON_NUM );
 		t_assert( num->num == -0.123 );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_true ( void  )
 {
 	status rc;
-	json_t * json, *true;
+	json_ctx_t * ctx;
+	json_node_t *true;
 	string_t string = string("true");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &true );
+		json_get_child( &ctx->root, 1, &true );
 		t_assert( true->type == JSON_TRUE );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // --------------------
 static void json_test_false ( void  )
 {
 	status rc;
-	json_t * json, *false;
+	json_ctx_t * ctx;
+	json_node_t *false;
 	string_t string = string("false");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &false );
+		json_get_child( &ctx->root, 1, &false );
 		t_assert( false->type == JSON_FALSE );
-		json_free( json );
+
+		rc == json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_null ( void  )
 {
 	status rc;
-	json_t * json, *null;
+	json_ctx_t * ctx;
+	json_node_t *null;
 	string_t string = string("null");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &null );
+		json_get_child( &ctx->root, 1, &null );
 		t_assert( null->type == JSON_NULL );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_string ( void  )
 {
 	status rc;
-	json_t * json, *str;
+	json_ctx_t * ctx;
+	json_node_t *str;
 	string_t string = string("\"hello world\"");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &str );
+		json_get_child( &ctx->root, 1, &str );
 		t_assert( str->type == JSON_STR );
-		json_free( json );
+
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_array ( void  )
 {
 	status rc;
-	json_t * json, *arr, *e;
+	json_ctx_t * ctx;
+	json_node_t *arr, *e;
 	string_t string = string("[ \"hello\" , true, 1, [] ]");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &arr );
+		json_get_child( &ctx->root, 1, &arr );
 		t_assert( arr->type == JSON_ARR );
 
 		json_get_child( arr, 1, &e );
@@ -170,81 +230,98 @@ static void json_test_array ( void  )
 		json_get_child( arr, 4, &e );
 		t_assert( e->type == JSON_ARR );
 
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_obj ( void  )
 {
 	status rc;
-	json_t * json, *obj, *e;
+	json_ctx_t * ctx;
+	json_node_t *obj, *e;
 	string_t string = string("{ \"one\" : true, \"two\" : {}, \"three\" : [] }");
+	//string_t string = string("{ \"one\" : true , \"two\" : false }");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &obj );
+		json_get_child( &ctx->root, 1, &obj );
 		t_assert( obj->type == JSON_OBJ );
 
-		json_get_child_by_name( obj, "one", l_strlen("one"), &e );
+		json_get_obj_child_by_name( obj, "one", l_strlen("one"), &e );
 		t_assert( e->type == JSON_TRUE );
 
-		json_get_child_by_name( obj, "two", l_strlen("two"), &e );
+		json_get_obj_child_by_name( obj, "two", l_strlen("two"), &e );
 		t_assert( e->type == JSON_OBJ );
 
-		json_get_child_by_name( obj, "three", l_strlen("three"), &e );
+		json_get_obj_child_by_name( obj, "three", l_strlen("three"), &e );
 		t_assert( e->type == JSON_ARR );
 
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_obj1 ( void  )
 {
 	status rc;
-	json_t * json, *obj, *e;
+	json_ctx_t * ctx;
+	json_node_t *obj, *e;
 	string_t string = string("{ \"one\" : { \"1\" : 123 }, \"two\" : false }");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &obj );
+		json_get_child( &ctx->root, 1, &obj );
 		t_assert( obj->type == JSON_OBJ );
 
-		json_get_child_by_name( obj, "one", l_strlen("one"), &e );
+		json_get_obj_child_by_name( obj, "one", l_strlen("one"), &e );
 		t_assert( e->type == JSON_OBJ );
-		json_get_child_by_name( e, "1", l_strlen("1"), &e );
+		json_get_obj_child_by_name( e, "1", l_strlen("1"), &e );
 		t_assert( e->type == JSON_NUM );
 		t_assert( e->num == 123 );
 
-		json_get_child_by_name( obj, "two", l_strlen("two"), &e );
+		json_get_obj_child_by_name( obj, "two", l_strlen("two"), &e );
 		t_assert( e->type == JSON_FALSE );
 
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_decode ( void  )
 {
 	status rc;
-	json_t * json;
+	json_ctx_t * ctx;
 	string_t string = string("{ \"1\" : [ { \"2\": false }, [ 1, 2, 3 ], true, false, null, 12345, -1 ], \"4\": 555 }");
 
-	rc = json_decode( &json, string.data, string.data + string.len );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, string.data, string.data + string.len );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 }
 // ---------------------
 static void json_test_encode ( void  )
 {
 	status rc;
-	json_t * json, *e, *parent, *parent1;
-	json_t * obj, *arr;
+	json_ctx_t* ctx;
+	json_node_t *e, *parent, *parent1;
+	json_node_t * obj, *arr;
 	uint32 i, j;
 
 	string_t obj_arr[3] = { string("obj1"), string("obj2"), string("obj3") };
@@ -268,40 +345,47 @@ static void json_test_encode ( void  )
 			"string123"
 		]
 	} */
-	rc = json_create( &json );
-	e = json_add_obj( json );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	e = json_add_obj( ctx, &ctx->root );
 	parent = e;
 	for( i = 0; i < 3; i++ ) {
-		e = json_obj_add_child( parent, obj_arr[i].data, obj_arr[i].len );
-		e = json_add_arr( e );
+		e = json_obj_add_child( ctx, parent, obj_arr[i].data, obj_arr[i].len );
+		e = json_add_arr( ctx, e );
 		parent1 = e;
 		for( j = 0; j < 3; j ++ ) {
-			json_add_str( parent1, str_arr[i].data, str_arr[i].len );
+			json_add_str( ctx, parent1, str_arr[i].data, str_arr[i].len );
 		}
 	}
-	rc = json_encode( json, &meta );
+	rc = json_encode( ctx, &meta );
 	t_assert( rc == OK );
 	//t_echo( INFO, "%.*s", meta_len( meta->pos, meta->last ), meta->pos );
 
 	if( rc == OK ) {
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 
-	rc = json_decode( &json, meta->pos, meta->last );
+	rc = json_ctx_create( &ctx );
+	t_assert( rc == OK );
+
+	rc = json_decode( ctx, meta->pos, meta->last );
 	t_assert( rc == OK );
 
 	if( rc == OK ) {
-		json_get_child( json, 1, &obj );
+		json_get_child( &ctx->root, 1, &obj );
 		t_assert( obj->type == JSON_OBJ );
 
-		json_get_child_by_name( obj, "obj1", l_strlen("obj1"), &arr );
+		json_get_obj_child_by_name( obj, "obj1", l_strlen("obj1"), &arr );
 		t_assert( arr->type == JSON_ARR );
 
 		json_get_child( arr, 1, &e );
 		t_assert( e->type == JSON_STR );
 		t_assert( e->name.len == l_strlen("string1") );
 
-		json_free( json );
+		rc = json_ctx_free( ctx );
+		t_assert( rc == OK );
 	}
 	meta_free( meta );
 }
@@ -315,27 +399,32 @@ static void json_test_encode1( void )
 		"3":"345"
 	}
 	*/
-	json_t * json,* obj, *v;
+	json_ctx_t * ctx;
+	json_node_t* obj, *v;
 	meta_t * meta;
 	status rc;
 	string_t key[] = { string("1"), string("2"), string("3") };
 	string_t val[] = { string("123"), string("234"), string("345") };
 
-	json_create( &json );
-	obj = json_add_obj( json );
-	v = json_obj_add_child( obj, key[0].data, key[0].len );
-	json_add_str( v, key[0].data, key[0].len );
-
-	v = json_obj_add_child( obj, key[1].data, key[1].len );
-	json_add_str( v, key[1].data, key[1].len );
-
-	v = json_obj_add_child( obj, key[2].data, key[2].len );
-	json_add_str( v, key[2].data, key[2].len );
-
-	rc = json_encode( json, &meta );
+	rc = json_ctx_create( &ctx );
 	t_assert( rc == OK );
 
-	json_free( json );
+	obj = json_add_obj( ctx, &ctx->root );
+	v = json_obj_add_child( ctx, obj, key[0].data, key[0].len );
+	json_add_str( ctx, v, key[0].data, key[0].len );
+
+	v = json_obj_add_child( ctx, obj, key[1].data, key[1].len );
+	json_add_str( ctx, v, key[1].data, key[1].len );
+
+	v = json_obj_add_child( ctx, obj, key[2].data, key[2].len );
+	json_add_str( ctx, v, key[2].data, key[2].len );
+
+	rc = json_encode( ctx, &meta );
+	t_assert( rc == OK );
+
+	rc = json_ctx_free( ctx );
+	t_assert( rc == OK );
+
 	meta_free( meta );
 }
 // ---------------------

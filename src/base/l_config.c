@@ -41,10 +41,10 @@ status config_get ( meta_t ** meta, char * path )
 	return OK;
 }
 // config_parse_global ----------
-static status config_parse_global( json_t * json )
+static status config_parse_global( json_node_t * json )
 {
 	char str[1024] = {0};
-	json_t *root_obj, *v;
+	json_node_t *root_obj, *v;
 
 	json_get_child( json, 1, &root_obj );
 	if( OK == json_get_obj_bool(root_obj, "daemon", l_strlen("daemon"), &v ) ) {
@@ -102,11 +102,11 @@ static status config_parse_global( json_t * json )
 	return OK;
 }
 // config_parse_http -----------
-static status config_parse_http( json_t * json )
+static status config_parse_http( json_node_t * json )
 {
 	char str[1024] = {0};
-	json_t * root_obj, *http_obj, *arr, *v;
-	uint32 i;
+	json_node_t * root_obj, *http_obj, *arr, *v;
+	queue_t * q;
 
 	json_get_child( json, 1, &root_obj );
 	if( OK ==  json_get_obj_obj(root_obj, "http", l_strlen("http"), &http_obj ) ) {
@@ -136,8 +136,12 @@ static status config_parse_http( json_t * json )
 				err_log("%s --- http need specify a valid 'home' and 'index'", __func__ );
 				return ERROR;
 			}
-			for( i = 1; i <= arr->list->elem_num; i ++ ) {
-				json_get_child( arr, i, &v );
+			for( q = queue_head(&arr->child); q != queue_tail( &arr->child ); q = queue_next(q) ) {
+				v = l_get_struct( q, json_node_t, queue );
+				if( v->type != JSON_NUM ) {
+					err_log("%s --- http listen must be number", __func__ );
+					return ERROR;
+				}
 				conf.http[conf.http_n++] = (uint32)v->num;
 			}
 		}
@@ -150,8 +154,12 @@ static status config_parse_http( json_t * json )
 				err_log("%s --- https need specify a valid 'sslcrt' and 'sslkey'", __func__ );
 				return ERROR;
 			}
-			for( i = 1; i <= arr->list->elem_num; i ++ ) {
-				json_get_child( arr, i, &v );
+			for( q = queue_head(&arr->child); q != queue_tail( &arr->child ); q = queue_next(q) ) {
+				v = l_get_struct( q, json_node_t, queue );
+				if( v->type != JSON_NUM ) {
+					err_log("%s --- https listen must be number", __func__ );
+					return ERROR;
+				}
 				conf.https[conf.https_n++] = (uint32)v->num;
 			}
 		}
@@ -159,9 +167,9 @@ static status config_parse_http( json_t * json )
 	return OK;
 }
 // config_parse_tunnel -------------
-static status config_parse_tunnel( json_t * json )
+static status config_parse_tunnel( json_node_t * json )
 {
-	json_t * root_obj, *tunnel_obj, *v;
+	json_node_t * root_obj, *tunnel_obj, *v;
 	status rc;
 
 	json_get_child( json, 1, &root_obj );
@@ -196,9 +204,9 @@ static status config_parse_tunnel( json_t * json )
 	return OK;
 }
 // config_parse_perf -------------
-static status config_parse_perf( json_t * json )
+static status config_parse_perf( json_node_t * json )
 {
-	json_t * root_obj, *perf_obj, *v;
+	json_node_t * root_obj, *perf_obj, *v;
 	status rc;
 
 	json_get_child( json, 1, &root_obj );
@@ -214,9 +222,9 @@ static status config_parse_perf( json_t * json )
 	return OK;
 }
 // config_parse_lktp --------
-static status config_parse_lktp( json_t * json )
+static status config_parse_lktp( json_node_t * json )
 {
-	json_t * root_obj, *lktp_obj, *v;
+	json_node_t * root_obj, *lktp_obj, *v;
 	status rc;
 
 	json_get_child( json, 1, &root_obj );
@@ -245,7 +253,7 @@ static status config_parse_lktp( json_t * json )
 	return OK;
 }
 // config_parse -----
-static status config_parse( json_t * json )
+static status config_parse( json_node_t * json )
 {
 	if( OK != config_parse_global( json ) ) {
 		err_log( "%s --- parse global", __func__ );
@@ -272,30 +280,36 @@ static status config_parse( json_t * json )
 // config_start ----
 static status config_start( void )
 {
-	json_t * json;
-	meta_t * meta;
+	json_ctx_t * ctx = NULL;
 
-	if( OK != config_get( &meta, L_PATH_CONFIG ) ) {
+	if( OK != config_get( &conf.meta, L_PATH_CONFIG ) ) {
 		err_log( "%s --- configuration file open", __func__  );
-		return ERROR;
+		goto failed;
 	}
-	debug_log( "%s --- configuration file:\n[%.*s]",
-		__func__,
-		meta_len( meta->pos, meta->last ),
-		meta->pos
-	);
-	if( OK != json_decode( &json, meta->pos, meta->last ) ) {
+	debug_log( "%s --- configuration file:\n[%.*s]", __func__, meta_len( conf.meta->pos, conf.meta->last ), conf.meta->pos);
+	if( OK != json_ctx_create( &ctx ) ) {
+		err_log("%s --- json ctx create", __func__ );
+		goto failed;
+	}
+	if( OK != json_decode( ctx, conf.meta->pos, conf.meta->last ) ) {
 		err_log("%s --- configuration file decode failed", __func__ );
-		meta_free( meta );
-		return ERROR;
+		goto failed;
 	}
-	conf.meta = meta;
-	if( OK != config_parse( json ) ) {
-		json_free( json );
-		return ERROR;
+	if( OK != config_parse( &ctx->root ) ) {
+		goto failed;
 	}
-	json_free( json );
+	json_ctx_free( ctx );
 	return OK;
+failed:
+	if( conf.meta ) {
+		meta_free( conf.meta );
+	}
+	conf.meta = NULL;
+	if( ctx ) {
+		json_ctx_free( ctx );
+	}
+	ctx = NULL;
+	return ERROR;
 }
 // config_init ----
 status config_init ( void )
@@ -312,6 +326,8 @@ status config_init ( void )
 // config_end -----
 status config_end ( void )
 {
-	meta_free( conf.meta );
+	if( conf.meta ) {
+		meta_free( conf.meta );
+	}
 	return OK;
 }

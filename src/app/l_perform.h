@@ -67,7 +67,7 @@ status performance_process_running( void );
 status performance_process_start ( void );
 status performance_process_stop ( void );
 
-status performance_count_output( json_t ** data );
+status performance_count_output( void * data );
 
 status perform_process_init( void );
 status perform_process_end( void );

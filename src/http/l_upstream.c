@@ -482,10 +482,10 @@ static status upstream_setting_get_string( upstream_t * up, string_t *url, strin
 	return OK;
 }
 // upstream_setting_get -------
-static status upstream_setting_get( upstream_t * up, json_t * json )
+static status upstream_setting_get( upstream_t * up, json_node_t * json )
 {
 	string_t json_ip, json_port, json_host, json_uri;
-	json_t *obj, *value;
+	json_node_t *obj, *value;
 	uint32 ssl_flag = 0;
 	char str[1024] = {0};
 
@@ -547,7 +547,7 @@ static status upstream_setting_get( upstream_t * up, json_t * json )
 	return OK;
 }
 // upstream_start ----
-status upstream_start( void * data, json_t * json )
+status upstream_start( void * data, json_node_t * json )
 {
 	upstream_t * up;
 	webser_t * webser;

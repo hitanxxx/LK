@@ -186,6 +186,7 @@ int32 main( int argc, char * argv[] )
 
 	conf.http_access_log = 1;
 	conf.log_error = 1;
+	conf.log_debug = 1;
 	l_time_update( );
 	if( OK != get_option( argc, argv ) ) {
 		err_log("get option", __func__ );
@@ -194,6 +195,8 @@ int32 main( int argc, char * argv[] )
 	if( l_process_signal ) {
 		return do_option( );
 	}
+	test_init( );
+	test_run( );
 	if( OK != module_init( ) ) {
 		err_log("static module init");
 		return ERROR;
@@ -203,8 +206,6 @@ int32 main( int argc, char * argv[] )
 		err_log("create pid file" );
 		goto over;
 	}
-	test_init( );
-	test_run( );
 	if( OK != listen_start( ) ) {
 		err_log( "listen_start failed" );
 		listen_stop( );

@@ -611,12 +611,13 @@ static status performance_count_change( l_atomic_t * count, uint32 value )
 	return OK;
 }
 // performance_count_output --------------
-status performance_count_output( json_t ** data )
+status performance_count_output( void * data )
 {
 	perform_pipeline_t * pipeline;
 	uint32 i=0;
-	json_t *json, *root, *ob_name, *ob_arr, *length_name, *length;
-	json_t *obj, *v, *vv;
+	json_ctx_t * ctx;
+	json_node_t *root, *ob_name, *ob_arr, *length_name, *length;
+	json_node_t *obj, *v, *vv;
 	string_t arr_name = string("result");
 	string_t index_str = string("index");
 	string_t success_str = string("success");
@@ -631,69 +632,67 @@ status performance_count_output( json_t ** data )
 	string_t str_4xx = string("Client Error");
 	string_t str_5xx = string("Server Error");
 
-	if( ERROR == json_create( &json ) ) {
-		err_log(  "%s --- json create", __func__ );
-		return ERROR;
-	}
-	root = json_add_obj( json );
-	length = json_obj_add_child( root, length_str.data, length_str.len );
-	json_add_num( length, ( perf_settings.list_pipeline ? perf_settings.list_pipeline->elem_num : 0 ) );
+	ctx = data;
+	root = &ctx->root;
+	root = json_add_obj( ctx, root );
 
-	ob_name = json_obj_add_child( root, arr_name.data, arr_name.len );
-	ob_arr = json_add_arr( ob_name );
+	length = json_obj_add_child( ctx, root, length_str.data, length_str.len );
+	json_add_num( ctx, length, ( perf_settings.list_pipeline ? perf_settings.list_pipeline->elem_num : 0 ) );
+
+	ob_name = json_obj_add_child( ctx, root, arr_name.data, arr_name.len );
+	ob_arr = json_add_arr( ctx, ob_name );
 
 	if( perf_settings.list_pipeline ) {
 		for( i = 1; i <= perf_settings.list_pipeline->elem_num; i ++ ) {
 			pipeline = mem_list_get( perf_settings.list_pipeline, i );
 
-			obj = json_add_obj( ob_arr );
+			obj = json_add_obj( ctx, ob_arr );
 
 			// index
-			v = json_obj_add_child( obj, index_str.data, index_str.len );
-			json_add_num( v, pipeline->index );
+			v = json_obj_add_child( ctx, obj, index_str.data, index_str.len );
+			json_add_num( ctx, v, pipeline->index );
 
 			// success
-			v = json_obj_add_child( obj, success_str.data, success_str.len );
-			json_add_num( v, perf_count.perform_success[i-1] );
+			v = json_obj_add_child( ctx, obj, success_str.data, success_str.len );
+			json_add_num( ctx, v, perf_count.perform_success[i-1] );
 
 			// failed
-			v = json_obj_add_child( obj, failed_str.data, failed_str.len );
-			json_add_num( v, perf_count.perform_failed[i-1] );
+			v = json_obj_add_child( ctx, obj, failed_str.data, failed_str.len );
+			json_add_num( ctx, v, perf_count.perform_failed[i-1] );
 
 			// send
-			v = json_obj_add_child( obj, send_str.data, send_str.len );
-			json_add_num( v, perf_count.perform_sends[i-1] );
+			v = json_obj_add_child( ctx, obj, send_str.data, send_str.len );
+			json_add_num( ctx, v, perf_count.perform_sends[i-1] );
 
 			// recv
-			v = json_obj_add_child( obj, recv_str.data, recv_str.len );
-			json_add_num( v, perf_count.perform_recvs[i-1] );
+			v = json_obj_add_child( ctx, obj, recv_str.data, recv_str.len );
+			json_add_num( ctx, v, perf_count.perform_recvs[i-1] );
 
 			// 200
-			v = json_obj_add_child( obj, str_200.data, str_200.len );
-			json_add_num( v, perf_count.perform_200[i-1] );
+			v = json_obj_add_child( ctx, obj, str_200.data, str_200.len );
+			json_add_num( ctx, v, perf_count.perform_200[i-1] );
 
 			// 1xx
-			v = json_obj_add_child( obj, str_1xx.data, str_1xx.len );
-			json_add_num( v, perf_count.perform_1xx[i-1] );
+			v = json_obj_add_child( ctx, obj, str_1xx.data, str_1xx.len );
+			json_add_num( ctx, v, perf_count.perform_1xx[i-1] );
 
 			// 2xx
-			v = json_obj_add_child( obj, str_2xx.data, str_2xx.len );
-			json_add_num( v, perf_count.perform_2xx[i-1] );
+			v = json_obj_add_child( ctx, obj, str_2xx.data, str_2xx.len );
+			json_add_num( ctx, v, perf_count.perform_2xx[i-1] );
 
 			// 3xx
-			v = json_obj_add_child( obj, str_3xx.data, str_3xx.len );
-			json_add_num( v, perf_count.perform_3xx[i-1] );
+			v = json_obj_add_child( ctx, obj, str_3xx.data, str_3xx.len );
+			json_add_num( ctx, v, perf_count.perform_3xx[i-1] );
 
 			// 4xx
-			v = json_obj_add_child( obj, str_4xx.data, str_4xx.len );
-			json_add_num( v, perf_count.perform_4xx[i-1] );
+			v = json_obj_add_child( ctx, obj, str_4xx.data, str_4xx.len );
+			json_add_num( ctx, v, perf_count.perform_4xx[i-1] );
 
 			// 5xx
-			v = json_obj_add_child( obj, str_5xx.data, str_5xx.len );
-			json_add_num( v, perf_count.perform_5xx[i-1] );
+			v = json_obj_add_child( ctx, obj, str_5xx.data, str_5xx.len );
+			json_add_num( ctx, v, perf_count.perform_5xx[i-1] );
 		}
 	}
-	*data = json;
 	return OK;
 }
 // performance_count_init -----------
@@ -763,14 +762,14 @@ string_t *host )
 	return ERROR;
 }
 // performance_setting_init --------------
-static status performance_setting_init( json_t * json )
+static status performance_setting_init( json_node_t * json )
 {
-	json_t *t, *x, *v;
-	uint32 i;
+	json_node_t *t, *x, *v;
 	char str[1024];
 	perform_pipeline_t * pipeline;
 	string_t ip, host, method, uri;
 	uint32 port, https;
+	queue_t * q;
 
 	// perform setting data has been checked when saved
 	json_get_child( json, 1, &t );
@@ -787,23 +786,23 @@ static status performance_setting_init( json_t * json )
 	json_get_obj_bool( t, "keepalive", l_strlen("keepalive"), &x );
 	perf_settings.keepalive = (x->type == JSON_TRUE) ? 1 : 0;
 
-	debug_log(  "%s --- perf_setting_time_n	[%d]",
-	__func__, perf_settings.running_time_sec );
-	debug_log(  "%s --- perf_setting_concurrent_n	[%d]",
-	__func__, perf_settings.concurrent );
-	debug_log(  "%s --- perf_setting_keepalive_bool	[%d]",
-	__func__, perf_settings.keepalive );
-
 	json_get_obj_arr( t, "pipeline", l_strlen("pipeline"), &x );
+
+	debug_log(  "%s --- perf_setting_time_n	[%d]", __func__, perf_settings.running_time_sec );
+	debug_log(  "%s --- perf_setting_concurrent_n	[%d]", __func__, perf_settings.concurrent );
+	debug_log(  "%s --- perf_setting_keepalive_bool	[%d]", __func__, perf_settings.keepalive );
+
 	mem_list_create( &perf_settings.list_pipeline, sizeof(perform_pipeline_t) );
-	for( i = 1; i <= x->list->elem_num; i ++ ) {
+	for( q = queue_head( &x->child ); q != queue_tail( &x->child ); q = queue_next(q) ) {
+
 		pipeline = mem_list_push( perf_settings.list_pipeline );
 		if( OK != l_mem_page_create( &pipeline->page, 4096 ) ) {
 			err_log("%s --- mem page create", __func__ );
 			return ERROR;
 		}
 		memset( &pipeline->addr, 0, sizeof(pipeline->addr) );
-		json_get_child( x, i, &t );
+
+		t = l_get_struct( q, json_node_t, queue );
 
 		json_get_obj_num( t, "index", l_strlen("index"), &v );
 		pipeline->index = (uint32)v->num;
@@ -874,19 +873,14 @@ static status performance_setting_init( json_t * json )
 		}
 		memcpy( pipeline->uri.data, uri.data, uri.len );
 		// ---
-		debug_log(  "%s -------------------", __func__ );
-		debug_log( "%s --- https [%d]", __func__,
-	 	pipeline->https );
-		debug_log(  "%s --- ip	[%.*s]", __func__,
-		pipeline->ip.len, pipeline->ip.data );
-		debug_log(  "%s --- port	[%d]", 	 __func__,
-		pipeline->port );
-		debug_log(  "%s --- host	[%.*s]", __func__,
-		pipeline->host.len, pipeline->host.data );
-		debug_log(  "%s --- uri	[%.*s]", __func__,
-		pipeline->uri.len, pipeline->uri.data );
-		debug_log(  "%s --- method	[%.*s]", __func__,
-		pipeline->method.len, pipeline->method.data );
+		debug_log(  "%s ------------------------------------------------------", __func__ );
+		debug_log( "%s --- https [%d]", __func__, pipeline->https );
+		debug_log(  "%s --- ip	[%.*s]", __func__, pipeline->ip.len, pipeline->ip.data );
+		debug_log(  "%s --- port [%d]", __func__, pipeline->port );
+		debug_log(  "%s --- host [%.*s]", __func__, pipeline->host.len, pipeline->host.data );
+		debug_log(  "%s --- uri	[%.*s]", __func__, pipeline->uri.len, pipeline->uri.data );
+		debug_log(  "%s --- method [%.*s]", __func__, pipeline->method.len, pipeline->method.data );
+
 		if ( OK == json_get_obj_str( t, "body", l_strlen("body"), &v ) ) {
 			pipeline->body.len = v->name.len;
 			pipeline->body.data = l_mem_alloc( pipeline->page, pipeline->body.len );
@@ -895,8 +889,7 @@ static status performance_setting_init( json_t * json )
 				return ERROR;
 			}
 			memcpy( pipeline->body.data, v->name.data, v->name.len );
-			debug_log(  "%s --- body	[%.*s]", __func__,
-			pipeline->body.len, pipeline->body.data );
+			debug_log(  "%s --- body [%.*s]", __func__, pipeline->body.len, pipeline->body.data );
 		}
 	}
 	return OK;
@@ -935,11 +928,11 @@ status performance_process_running( void )
 // performance_process_prepare ------------------
 static status performance_process_prepare ( void * data )
 {
-	json_t * json;
+	json_node_t * json;
 	uint32 i, k;
 	perform_t * p;
 
-	json = (json_t*)data;
+	json = (json_node_t*)data;
 	// in running
 	if( performance_process_running() ) {
 		err_log("%s --- perform test is running", __func__ );
@@ -976,22 +969,36 @@ static status performance_process_prepare ( void * data )
 // performance_process_start -------------
 status performance_process_start ( void )
 {
-	meta_t * t;
-	json_t * json;
+	meta_t * t = NULL;
+	json_ctx_t * ctx = NULL;
 
 	if( OK != config_get( &t, L_PATH_PERFTEMP ) ) {
 		err_log( "%s --- get perf data", __func__ );
 		return ERROR;
 	}
-	if( OK != json_decode( &json, t->pos, t->last ) ) {
-		err_log( "%s --- json decode", __func__ );
-		meta_free( t );
-		return ERROR;
+	if( OK != json_ctx_create( &ctx ) ) {
+		err_log("%s --- json ctx create", __func__ );
+		goto failed;
 	}
-	performance_process_prepare( (void*)json );
-	json_free( json );
+	if( OK != json_decode( ctx, t->pos, t->last ) ) {
+		err_log( "%s --- json decode", __func__ );
+		goto failed;
+	}
+	performance_process_prepare( (void*)&ctx->root );
+
+	json_ctx_free( ctx );
+	ctx = NULL;
 	meta_free( t );
+	t = NULL;
 	return OK;
+failed:
+	if( t ) {
+		meta_free( t );
+	}
+	if( ctx ) {
+		json_ctx_free( ctx );
+	}
+	return ERROR;
 }
 // perform_process_init -------------------------
 status perform_process_init( void )
