@@ -166,11 +166,15 @@ static status json_parse_true( json_ctx_t * ctx )
 			state = tru;
 			continue;
 		} else if ( state == tru ) {
-			if( *p != 'u' ) return ERROR;
+			if( *p != 'u' ) {
+				return ERROR;
+			}
 			state = true;
 			continue;
 		} else if ( state == true ) {
-			if( *p != 'e' ) return ERROR;
+			if( *p != 'e' ) {
+				return ERROR;
+			}
 			return OK;
 		}
 	}
@@ -196,25 +200,32 @@ static status json_parse_false( json_ctx_t * ctx )
 			state = fa;
 			continue;
 		} else if ( state == fa ) {
-			if( *p != 'a' ) return ERROR;
+			if( *p != 'a' ) {
+				return ERROR;
+			}
 			state = fal;
 			continue;
 		} else if ( state == fal ) {
-			if( *p != 'l' ) return ERROR;
+			if( *p != 'l' ) {
+				return ERROR;
+			}
 			state = fals;
 			continue;
 		} else if ( state == fals ) {
-			if( *p != 's' ) return ERROR;
+			if( *p != 's' ) {
+				return ERROR;
+			}
 			state = false;
 			continue;
 		} else if ( state == false ) {
-			if( *p != 'e' ) return ERROR;
+			if( *p != 'e' ) {
+				return ERROR;
+			}
 			return OK;
 		}
 	}
 	return ERROR;
 }
-
 // json_parse_null -------
 static status json_parse_null( json_ctx_t * ctx )
 {
@@ -234,15 +245,21 @@ static status json_parse_null( json_ctx_t * ctx )
 			state = nu;
 			continue;
 		} else if ( state == nu ) {
-			if( *p != 'u' ) return ERROR;
+			if( *p != 'u' ) {
+				return ERROR;
+			}
 			state = nul;
 			continue;
 		} else if ( state == nul ) {
-			if( *p != 'l' ) return ERROR;
+			if( *p != 'l' ) {
+				return ERROR;
+			}
 			state = null;
 			continue;
 		} else if ( state == null ) {
-			if( *p != 'l' ) return ERROR;
+			if( *p != 'l' ) {
+				return ERROR;
+			}
 			return OK;
 		}
 	}
@@ -381,7 +398,6 @@ static status json_parse_obj_find_repeat( json_node_t * parent, json_node_t * ch
 	}
 	return ERROR;
 }
-
 // json_parse_obj ------------
 static status json_parse_obj( json_node_t * json, json_ctx_t * ctx )
 {
@@ -547,7 +563,6 @@ static status json_parse_array ( json_node_t * json, json_ctx_t * ctx )
 	}
 	return ERROR;
 }
-
 /// json_parse_num ------------
 static status json_parse_num ( json_node_t * json, json_ctx_t * ctx )
 {
@@ -702,12 +717,9 @@ static status json_parse_token( json_node_t * parent, json_ctx_t * ctx )
 
 	for( ; ctx->p < ctx->end; ctx->p ++ ) {
 		p = ctx->p;
-		if(
-		*p == ' '  ||
-		*p == '\r' ||
-		*p == '\n' ||
-		*p == '\t' ) continue;
-		if( *p == 't' ) {
+		if( *p == ' ' || *p == '\r' || *p == '\n' || *p == '\t' ) {
+			continue;
+		} else if( *p == 't' ) {
 			if( OK != json_parse_true( ctx ) ) {
 				return ERROR;
 			}
