@@ -37,6 +37,8 @@
 #include "l_lktpserver.h"
 #include "l_tunnel.h"
 #include "l_perform.h"
+#include "l_socks5.h"
+
 #include "l_webapi.h"
 
 status dynamic_module_init( void );

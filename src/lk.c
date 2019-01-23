@@ -19,6 +19,8 @@ static status module_init( void )
 	perform_init();
 	webapi_init();		// no end
 	lktpserv_init();	// no end
+	
+	socks5_local_init(); 	// no end
 	return OK;
 }
 // modules_end ----------------
