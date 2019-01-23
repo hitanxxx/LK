@@ -15,14 +15,209 @@ static status socks5_cycle_free( socks5_cycle_t * cycle )
 	return OK;
 }
 
-// socks5_time_out --------
-static void socks5_time_out( void * data )
+// socks5_cycle_time_out --------
+static void socks5_cycle_time_out( void * data )
+{
+	socks5_cycle_t * cycle;
+	
+	cycle = data;
+	socks5_cycle_free( cycle );
+}
+
+// socks5_local_connect_test -----
+static status socks5_local_connect_test( connection_t * c )
+{
+	int	err = 0;
+    socklen_t  len = sizeof(int);
+
+	if (getsockopt( c->fd, SOL_SOCKET, SO_ERROR, (void *) &err, &len) == -1 ) {
+		err = errno;
+	}
+	if (err) {
+		err_log("%s --- remote connect test, [%d]", __func__, errno );
+		return ERROR;
+	}
+	return OK;
+}
+// socks5_transport_out_recv ------
+static status socks5_transport_out_recv( event_t * ev )
 {
 	connection_t * c;
+	status rc;
+	socks5_cycle_t * cycle;
 
-	c = data;
+	c = ev->data;
+	cycle = c->data;
 
-	net_free( c );
+	rc = net_transport( cycle->out, 0 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport out recv failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->up->read->timer.data = (void*)cycle;
+	cycle->up->read->timer.handler = socks5_cycle_time_out;
+	timer_add( &cycle->up->read->timer, 3 );
+	return rc;
+}
+// socks5_transport_out_send ------
+static status socks5_transport_out_send( event_t * ev )
+{
+	connection_t * c;
+	status rc;
+	socks5_cycle_t * cycle;
+
+	c = ev->data;
+	cycle = c->data;
+
+	rc = net_transport( cycle->out, 1 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport out send failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->up->read->timer.data = (void*)cycle;
+	cycle->up->read->timer.handler = socks5_cycle_time_out;
+	timer_add( &cycle->up->read->timer, 3 );
+	return rc;
+}
+// socks5_transport_in_recv ------
+static status socks5_transport_in_recv( event_t * ev )
+{
+	connection_t * c;
+	status rc;
+	socks5_cycle_t * cycle;
+
+	c = ev->data;
+	cycle = c->data;
+
+	rc = net_transport( cycle->in, 0 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport in recv failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->down->read->timer.data = (void*)cycle;
+	cycle->down->read->timer.handler = socks5_cycle_time_out;
+	timer_add( &cycle->down->read->timer, 3 );
+	return rc;
+}
+// socks5_transport_in_send ------
+static status socks5_transport_in_send( event_t * ev )
+{
+	connection_t * c;
+	status rc;
+	socks5_cycle_t * cycle;
+
+	c = ev->data;
+	cycle = c->data;
+
+	rc = net_transport( cycle->in, 1 );
+	if( rc == ERROR ) {
+		err_log("%s --- net transport in send failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->down->read->timer.data = (void*)cycle;
+	cycle->down->read->timer.handler = socks5_cycle_time_out;
+	timer_add( &cycle->down->read->timer, 3 );
+	return OK;
+}
+// socks5_local_pipe -------
+static status socks5_local_pipe( event_t * ev )
+{
+	connection_t * down;
+	socks5_cycle_t * cycle;
+
+	down = ev->data;
+	cycle = down->data;
+	if( OK != net_transport_alloc( &cycle->in ) ) {
+		err_log("%s --- net_transport in alloc", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	if( OK != net_transport_alloc( &cycle->out ) ) {
+		err_log("%s --- net_transport out alloc", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	
+	cycle->in->recv_connection = cycle->down;
+	cycle->in->send_connection = cycle->up;
+
+	cycle->out->recv_connection = cycle->up;
+	cycle->out->send_connection = cycle->down;
+
+	cycle->down->read->handler = socks5_transport_in_recv;
+	cycle->up->write->handler = socks5_transport_in_send;
+
+	cycle->down->write->handler = socks5_transport_out_send;
+	cycle->up->read->handler = socks5_transport_out_recv;
+
+	event_opt( cycle->up->read, EVENT_READ );
+	event_opt( cycle->down->write, EVENT_WRITE );
+	event_opt( cycle->down->read, EVENT_READ );
+	event_opt( cycle->up->write, EVENT_WRITE );
+	
+	return AGAIN;
+}
+// socks5_local_response ----
+static status socks5_local_response( event_t * ev )
+{
+	connection_t * down;
+	socks5_cycle_t * cycle;
+	
+	down = ev->data;
+	cycle = down->data;
+	status rc;
+	rc = down->send_chain( down, down->meta );
+	if( rc == ERROR ) {
+		err_log( "%s ---  send failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	} else if( rc == DONE ) {
+		timer_del( &down->write->timer );
+		debug_log ( "%s --- socks5 local response send success", __func__ );
+		down->read->handler = socks5_local_pipe;
+		return down->read->handler( down->read );
+	}
+	down->write->timer.data = (void*)cycle;
+	down->write->timer.handler = socks5_cycle_time_out;
+	timer_add( &down->write->timer, 3 );
+	return rc;
+}
+// socks5_local_start -----
+static status socks5_local_start( event_t * ev )
+{
+	socks5_cycle_t * cycle;
+	connection_t* up, *down;
+
+	up = ev->data;
+	cycle = up->data;
+	down = cycle->down;
+	
+	
+	down->meta->last = down->meta->pos = down->meta->start;
+	*down->meta->last++ = 0x05;
+	*down->meta->last++ = 0x00;
+	*down->meta->last++ = 0x01;
+	*down->meta->last++ = 0x00;
+	
+	//
+	*down->meta->last++ = 0x00;
+	*down->meta->last++ = 0x00;
+	*down->meta->last++ = 0x00;
+	*down->meta->last++ = 0x00;
+	
+	*down->meta->last++ = 0x00;
+	*down->meta->last = 0x00;
+	
+	
+	up->read->handler = NULL;
+	up->write->handler = NULL;
+	event_opt( down->write, EVENT_WRITE );
+	down->write->handler = socks5_local_response;
+	return down->write->handler( down->write );
 }
 // socks5_local_connect_check ----
 static status socks5_local_connect_check( event_t * ev )
@@ -33,39 +228,17 @@ static status socks5_local_connect_check( event_t * ev )
 
 	up = ev->data;
 	cycle = up->data;
-	if( OK != tunnel_remote_connect_test( t->upstream ) ) {
-		err_log( "%s --- tunnel_remote_connect_test failed", __func__ );
-		tunnel_over( t );
+	if( OK != socks5_local_connect_test( up ) ) {
+		err_log( "%s --- socks5 local connect failed", __func__ );
+		socks5_cycle_free( cycle );
 		return ERROR;
 	}
 	debug_log ( "%s --- connect success", __func__ );
-	net_nodelay( upstream );
-	timer_del( &upstream->write->timer );
+	net_nodelay( up );
+	timer_del( &up->write->timer );
 
-	if( conf.tunnel_mode == TUNNEL_CLIENT ) {
-		t->upstream->ssl_flag = 1;
-		if( OK != ssl_create_connection( t->upstream, L_SSL_CLIENT ) ) {
-			err_log( "%s --- client upstream ssl create", __func__ );
-			tunnel_over( t );
-			return ERROR;
-		}
-		rc = ssl_handshake( t->upstream->ssl );
-		if( rc == ERROR ) {
-			err_log( "%s --- client upstream ssl handshake", __func__ );
-			tunnel_over( t );
-			return ERROR;
-		} else if ( rc == AGAIN ) {
-			upstream->ssl->handler = tunnel_remote_handshake;
-			upstream->write->timer.data = (void*)t;
-			upstream->write->timer.handler = tunnel_time_out;
-			timer_add( &upstream->write->timer, TUNNEL_TIMEOUT );
-			return AGAIN;
-		}
-		return tunnel_remote_handshake( t->upstream->write );
-	} else {
-		upstream->write->handler = tunnel_start;
-		return upstream->write->handler( upstream->write );
-	}
+	up->write->handler = socks5_local_start;
+	return up->write->handler( up->write );
 }
 // socks5_local_connect_start ------
 static status socks5_local_connect_start( event_t * ev )
@@ -86,9 +259,10 @@ static status socks5_local_connect_start( event_t * ev )
 	event_opt( up->write, EVENT_WRITE );
 
 	if( rc == AGAIN ) {
-		up->write->timer.data = (void*)t;
-		up->write->timer.handler = NULL;
-		timer_add( &up->write->timer, TUNNEL_TIMEOUT_CONNECT );
+		debug_log("%s --- connect again", __func__ );
+		up->write->timer.data = (void*)cycle;
+		up->write->timer.handler = socks5_cycle_time_out;
+		timer_add( &up->write->timer, 3 );
 		return AGAIN;
 	}
 	return up->write->handler( up->write );
@@ -102,9 +276,9 @@ static status socks5_connect( event_t * ev )
 	c = ev->data;
 	cycle = c->data;
 
-	debug_log("%s --- socks5_ connect", __func__  );
+	debug_log("%s --- socks5_connect", __func__  );
 	if( OK != net_alloc( &cycle->up ) ) {
-		err_log("%s --- net alloc up", __func__ )
+		err_log("%s --- net alloc up", __func__ );
 		socks5_cycle_free( cycle );
 		return ERROR;
 	}
@@ -124,7 +298,7 @@ static status socks5_connect( event_t * ev )
 
 	// getaddrinfo
 	struct addrinfo * res = NULL;
-	string_t * ip = NULL, * port = NULL;
+	string_t ip, port;
 	char ipstr[100] = {0}, portstr[20] = {0};
 
 	snprintf( ipstr, sizeof(ipstr), "%d.%d.%d.%d", (unsigned char )cycle->request.dst_addr[0],
@@ -132,16 +306,16 @@ static status socks5_connect( event_t * ev )
 	(unsigned char )cycle->request.dst_addr[2],
 	(unsigned char )cycle->request.dst_addr[3]
 	);
-	snprintf( portstr, sizeof(portstr), "%d", *(int32*)cycle->request.dst_port[0] );
+	snprintf( portstr, sizeof(portstr), "%d", ntohs(*(int32*)cycle->request.dst_port) );
 	ip.data = ipstr;
 	ip.len = l_strlen(ipstr);
 	port.data = portstr;
 	port.len = l_strlen(portstr);
 	debug_log("%s --- ip [%.*s] port [%.*s]", __func__ ,
-	ip->len, ip->data,
-	port->len, port->data
+	ip.len, ip.data,
+	port.len, port.data
 	);
-	res = net_get_addr( ip, port );
+	res = net_get_addr( &ip, &port );
 	if( !res ) {
 		err_log("%s --- get up address failed", __func__ );
 		socks5_cycle_free( cycle );
@@ -194,8 +368,8 @@ static status socks5_process_request( event_t * ev )
 				return ERROR;
 			} else if ( rc == AGAIN ) {
 				c->read->timer.data = (void*)cycle;
-				c->read->timer.handler = socks5_time_out;
-				timer_add( c->read->timer, 3 );
+				c->read->timer.handler = socks5_cycle_time_out;
+				timer_add( &c->read->timer, 3 );
 
 				debug_log("%s --- recv socks5 again", __func__ );
 				return AGAIN;
@@ -277,11 +451,13 @@ static status socks5_process_request( event_t * ev )
 				continue;
 			}
 			if( state == dst_port ) {
+				debug_log("%s --- port[0] %x", __func__, *p );
 				cycle->request.dst_port[0] = *p;
 				state = dst_port_end;
 				continue;
 			}
 			if( state == dst_port_end ) {
+				debug_log("%s --- port[1] %x", __func__, *p );
 				cycle->request.dst_port[1] = *p;
 
 				debug_log("%s --- process request success", __func__ );
@@ -302,7 +478,8 @@ static status socks5_process_request( event_t * ev )
 					(unsigned char)cycle->request.dst_addr[2],
 					(unsigned char)cycle->request.dst_addr[3]
 				);
-				debug_log("%s --- dst port [%d]", __func__, *(int32*)&cycle->request.dst_port[0] );
+				
+				debug_log("%s --- dst port [%d]", __func__, ntohs(*(int32*)cycle->request.dst_port ));
 
 				cycle->request.state = 0;
 				c->read->handler = socks5_connect;
@@ -339,8 +516,8 @@ static status socks5_local_auth_replay ( event_t * ev )
 		c->read->handler = socks5_process_request;
 		return c->read->handler( c->read );
 	}
-	c->read->timer.data = (void*)c;
-	c->read->timer.handler = socks5_time_out;
+	c->read->timer.data = (void*)cycle;
+	c->read->timer.handler = socks5_cycle_time_out;
 	timer_add( &c->read->timer, 3 );
 	return AGAIN;
 }

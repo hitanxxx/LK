@@ -32,6 +32,9 @@ typedef struct socks5_cycle_t {
 	socks5_response_t 		response;
 	connection_t * 		down;
 	connection_t * 		up;
+	
+	net_transport_t * in;
+	net_transport_t * out;
 } socks5_cycle_t;
 
 status socks5_local_init( void );
