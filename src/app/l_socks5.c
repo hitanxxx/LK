@@ -19,27 +19,147 @@ static status socks5_cycle_free( socks5_cycle_t * cycle )
 static void socks5_time_out( void * data )
 {
 	connection_t * c;
-	
+
 	c = data;
-	
+
 	net_free( c );
 }
+// socks5_local_connect_check ----
+static status socks5_local_connect_check( event_t * ev )
+{
+	socks5_cycle_t * cycle;
+	connection_t* up;
+	status rc;
 
+	up = ev->data;
+	cycle = up->data;
+	if( OK != tunnel_remote_connect_test( t->upstream ) ) {
+		err_log( "%s --- tunnel_remote_connect_test failed", __func__ );
+		tunnel_over( t );
+		return ERROR;
+	}
+	debug_log ( "%s --- connect success", __func__ );
+	net_nodelay( upstream );
+	timer_del( &upstream->write->timer );
+
+	if( conf.tunnel_mode == TUNNEL_CLIENT ) {
+		t->upstream->ssl_flag = 1;
+		if( OK != ssl_create_connection( t->upstream, L_SSL_CLIENT ) ) {
+			err_log( "%s --- client upstream ssl create", __func__ );
+			tunnel_over( t );
+			return ERROR;
+		}
+		rc = ssl_handshake( t->upstream->ssl );
+		if( rc == ERROR ) {
+			err_log( "%s --- client upstream ssl handshake", __func__ );
+			tunnel_over( t );
+			return ERROR;
+		} else if ( rc == AGAIN ) {
+			upstream->ssl->handler = tunnel_remote_handshake;
+			upstream->write->timer.data = (void*)t;
+			upstream->write->timer.handler = tunnel_time_out;
+			timer_add( &upstream->write->timer, TUNNEL_TIMEOUT );
+			return AGAIN;
+		}
+		return tunnel_remote_handshake( t->upstream->write );
+	} else {
+		upstream->write->handler = tunnel_start;
+		return upstream->write->handler( upstream->write );
+	}
+}
+// socks5_local_connect_start ------
+static status socks5_local_connect_start( event_t * ev )
+{
+	status rc;
+	socks5_cycle_t * cycle;
+	connection_t* up;
+
+	up = ev->data;
+	cycle = up->data;
+	rc = event_connect( up->write );
+	if( rc == ERROR ) {
+		err_log( "%s --- connect error", __func__ );
+		socks5_cycle_free(cycle);
+		return ERROR;
+	}
+	up->write->handler = socks5_local_connect_check;
+	event_opt( up->write, EVENT_WRITE );
+
+	if( rc == AGAIN ) {
+		up->write->timer.data = (void*)t;
+		up->write->timer.handler = NULL;
+		timer_add( &up->write->timer, TUNNEL_TIMEOUT_CONNECT );
+		return AGAIN;
+	}
+	return up->write->handler( up->write );
+}
 // socks5_connect -----------
 static status socks5_connect( event_t * ev )
 {
-	connection_t * c;
+	connection_t * c, * up;
 	socks5_cycle_t * cycle;
-	
+
 	c = ev->data;
 	cycle = c->data;
-	
-	debug_log("%s --- socks5_ connect", __func__  );
-	socks5_cycle_free( cycle );
-	
-	return OK;
-}
 
+	debug_log("%s --- socks5_ connect", __func__  );
+	if( OK != net_alloc( &cycle->up ) ) {
+		err_log("%s --- net alloc up", __func__ )
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->up->send = sends;
+	cycle->up->recv = recvs;
+	cycle->up->send_chain = send_chains;
+	cycle->up->recv_chain = NULL;
+	cycle->up->data = (void*)cycle;
+
+	if( !cycle->up->meta ) {
+		if( OK != meta_alloc( &cycle->up->meta, 4096 ) ) {
+			err_log( "%s --- up meta alloc", __func__ );
+			socks5_cycle_free( cycle );
+			return ERROR;
+		}
+	}
+
+	// getaddrinfo
+	struct addrinfo * res = NULL;
+	string_t * ip = NULL, * port = NULL;
+	char ipstr[100] = {0}, portstr[20] = {0};
+
+	snprintf( ipstr, sizeof(ipstr), "%d.%d.%d.%d", (unsigned char )cycle->request.dst_addr[0],
+	(unsigned char )cycle->request.dst_addr[1],
+	(unsigned char )cycle->request.dst_addr[2],
+	(unsigned char )cycle->request.dst_addr[3]
+	);
+	snprintf( portstr, sizeof(portstr), "%d", *(int32*)cycle->request.dst_port[0] );
+	ip.data = ipstr;
+	ip.len = l_strlen(ipstr);
+	port.data = portstr;
+	port.len = l_strlen(portstr);
+	debug_log("%s --- ip [%.*s] port [%.*s]", __func__ ,
+	ip->len, ip->data,
+	port->len, port->data
+	);
+	res = net_get_addr( ip, port );
+	if( !res ) {
+		err_log("%s --- get up address failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	memset( &cycle->up->addr, 0, sizeof(struct sockaddr_in) );
+	memcpy( &cycle->up->addr, res->ai_addr, sizeof(struct sockaddr_in) );
+	freeaddrinfo( res );
+
+	timer_del( &cycle->down->read->timer );
+	cycle->down->read->handler = NULL;
+	cycle->down->write->handler = NULL;
+
+	cycle->up->read->handler = NULL;
+	cycle->up->write->handler = socks5_local_connect_start;
+
+	return cycle->up->write->handler( cycle->up->write );
+}
 // socks5_process_request -------------
 static status socks5_process_request( event_t * ev )
 {
@@ -61,12 +181,11 @@ static status socks5_process_request( event_t * ev )
 		dst_port,
 		dst_port_end
 	} state;
-	
+
 	c = ev->data;
 	cycle = c->data;
-	
+
 	while( 1 ) {
-		
 		if( c->meta->pos == c->meta->last )  {
 			rc = c->recv( c, c->meta->last, meta_len( c->meta->last, c->meta->end ) );
 			if( rc == ERROR ) {
@@ -74,20 +193,24 @@ static status socks5_process_request( event_t * ev )
 				socks5_cycle_free( cycle );
 				return ERROR;
 			} else if ( rc == AGAIN ) {
+				c->read->timer.data = (void*)cycle;
+				c->read->timer.handler = socks5_time_out;
+				timer_add( c->read->timer, 3 );
+
 				debug_log("%s --- recv socks5 again", __func__ );
 				return AGAIN;
 			} else {
 				c->meta->last += rc;
 			}
 		}
-		
+
 		rc = meta_len( c->meta->pos, c->meta->last );
 		debug_log("%s --- recvd [%d] bytes", __func__, rc );
-		
+
 		state = cycle->request.state;
 		for( ; c->meta->pos < c->meta->last; c->meta->pos ++ ) {
 			p = c->meta->pos;
-			
+
 			if( state == ver ) {
 				cycle->request.ver = *p;
 				debug_log("%s --- socks5 process ver [%x]", __func__, cycle->request.ver );
@@ -138,7 +261,7 @@ static status socks5_process_request( event_t * ev )
 						} else {
 							cycle->request.dst_addr[cycle->request.offset++] = *p;
 						}
-						
+
 						break;
 					default:
 						break;
@@ -160,27 +283,27 @@ static status socks5_process_request( event_t * ev )
 			}
 			if( state == dst_port_end ) {
 				cycle->request.dst_port[1] = *p;
-				
+
 				debug_log("%s --- process request success", __func__ );
 				debug_log("%s --- version [%x]", __func__, cycle->request.ver );
 				debug_log("%s --- cmd [%x]", __func__, cycle->request.cmd );
 				debug_log("%s --- rsv [%x]", __func__, cycle->request.rsv );
 				debug_log("%s --- atyp[%x]", __func__, cycle->request.atyp);
 				debug_log("%s --- dst addr [%x, %x, %x, %x]", __func__, cycle->request.dst_addr[0],
-					cycle->request.dst_addr[1], 
+					cycle->request.dst_addr[1],
 					cycle->request.dst_addr[2],
 					cycle->request.dst_addr[3]);
 				debug_log("%s --- dst port [%x-%x]", __func__, cycle->request.dst_port[0],
-					cycle->request.dst_port[1] ); 
-				
-				debug_log("%s --- dst addr [%d %d %d %d]", __func__, 
+					cycle->request.dst_port[1] );
+
+				debug_log("%s --- dst addr [%d %d %d %d]", __func__,
 					(unsigned char)cycle->request.dst_addr[0],
 					(unsigned char)cycle->request.dst_addr[1],
 					(unsigned char)cycle->request.dst_addr[2],
 					(unsigned char)cycle->request.dst_addr[3]
 				);
 				debug_log("%s --- dst port [%d]", __func__, *(int32*)&cycle->request.dst_port[0] );
-				
+
 				cycle->request.state = 0;
 				c->read->handler = socks5_connect;
 				return c->read->handler( c->read );
@@ -193,36 +316,25 @@ static status socks5_process_request( event_t * ev )
 
 // socks5_local_auth_replay ------------
 static status socks5_local_auth_replay ( event_t * ev )
-{	
+{
 	connection_t * c;
 	status rc;
 	socks5_cycle_t * cycle = NULL;
-	
+
 	c = ev->data;
-	
+	cycle = c->data;
+
 	rc = c->send_chain( c, c->meta );
 	if( rc == ERROR ) {
 		err_log("%s --- send auth replay failed", __func__ );
-		net_free( c );
+		socks5_cycle_free( cycle );
 		return ERROR;
 	} else if ( rc == DONE ) {
 		debug_log("%s --- send auth replay success", __func__ );
 		timer_del( &c->read->timer );
-		
+
 		c->meta->pos = c->meta->last = c->meta->start;
-		
-		cycle = l_safe_malloc( sizeof(socks5_cycle_t) );
-		if( !cycle ) {
-			err_log("%s --- safe malloc cycle", __func__ );
-			net_free( c );
-			return ERROR;
-		}
-		memset( cycle, 0, sizeof(socks5_cycle_t) );
-		memset( &cycle->request, 0, sizeof(socks5_request_t) );
-		
-		c->data = (void*)cycle;
-		cycle->down = c;
-		
+
 		c->write->handler = NULL;
 		c->read->handler = socks5_process_request;
 		return c->read->handler( c->read );
@@ -237,23 +349,23 @@ static status socks5_local_auth_replay_prepare( event_t * ev )
 {
 	connection_t * c;
 	c = ev->data;
-	
+
 	/*
 		1 byte 		1 byte
-		version | ack authentication method 
-		
+		version | ack authentication method
+
 	*/
 	c->meta->pos = c->meta->last = c->meta->start;
 	*c->meta->last ++ = 0x05;
 	*c->meta->last ++ = 0x00;
-	
+
 	debug_log("%s --- socks5 auth replay [%d]", __func__, meta_len( c->meta->pos, c->meta->last ) );
 	debug_log("%s --- socks5 replay [%x,%x]", __func__, *c->meta->pos, * (c->meta->pos + 1) );
-	
+
 	c->read->handler = NULL;
 	c->write->handler = socks5_local_auth_replay;
 	event_opt( c->write, EVENT_WRITE );
-	
+
 	return c->write->handler( c->write );
 }
 
@@ -261,22 +373,32 @@ static status socks5_local_auth_replay_prepare( event_t * ev )
 static status socks5_local_state_init( event_t * ev )
 {
 	connection_t * c;
-	
+
 	char buff[1024] = {0};
 	char * p = NULL;
 	int32 i = 0;
 	ssize_t rc;
-	
+	socks5_cycle_t * cycle = NULL;
+
 	c = ev->data;
 	/*
 		1 byte		1 byte					1-255 byte
-		version | authentication method | auth method list 
-		
+		version | authentication method | auth method list
+
 	*/
+	cycle = l_safe_malloc( sizeof(socks5_cycle_t) );
+	if( !cycle ) {
+		err_log("%s --- l safe malloc cycle", __func__ );
+		return ERROR;
+	}
+	memset( cycle, 0, sizeof(socks5_cycle_t) );
+	cycle->down = c;
+
+	c->data = (void*)cycle;
 	if( !c->meta ) {
 		if( OK != meta_alloc( &c->meta, SOCKS5_META_LENGTH ) ) {
 			err_log( "%s --- c meta alloc", __func__ );
-			net_free(c);
+			socks5_cycle_free( cycle );
 			return ERROR;
 		}
 	}
@@ -288,7 +410,7 @@ static status socks5_local_state_init( event_t * ev )
 	rc = c->recv( c, c->meta->last, meta_len( c->meta->last, c->meta->end ) );
 	if( rc == ERROR ) {
 		err_log("%s --- recv socks5 auth failed", __func__ );
-		net_free( c );
+		socks5_cycle_free( cycle );
 		return ERROR;
 	} else if ( rc == AGAIN ) {
 		debug_log("%s --- recv socks5 again", __func__ );
@@ -296,7 +418,7 @@ static status socks5_local_state_init( event_t * ev )
 	} else {
 		c->meta->last += rc;
 	}
-	
+
 	rc = meta_len( c->meta->pos, c->meta->last );
 	debug_log("%s --- recvd [%d] bytes", __func__, rc );
 	if( rc < 3 ) {
@@ -307,24 +429,21 @@ static status socks5_local_state_init( event_t * ev )
 		if( buff[1] > 0x00 ) {
 			for( p = &buff[2]; i < buff[1]; i ++, p ++ ) {
 				debug_log("%s --- authenticaition methods [%x]", __func__, *p );
-			} 
+			}
 		} else {
 			debug_log("%s --- have't authentication method", __func__ );
 		}
-		
+
 		c->read->handler = socks5_local_auth_replay_prepare;
 		return c->read->handler( c->read );
 	}
 }
-
 // socks5_local_init -----------
 status socks5_local_init( void )
 {
 	listen_add( 3333, socks5_local_state_init, TCP );
-	
 	return OK;
 }
-
 // socks5_local_end -----------
 status socks5_local_end( void )
 {
