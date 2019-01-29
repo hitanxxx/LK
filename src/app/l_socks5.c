@@ -19,7 +19,7 @@ static status socks5_cycle_free( socks5_cycle_t * cycle )
 static void socks5_cycle_time_out( void * data )
 {
 	socks5_cycle_t * cycle;
-	
+
 	cycle = data;
 	socks5_cycle_free( cycle );
 }
@@ -141,7 +141,7 @@ static status socks5_local_pipe( event_t * ev )
 		socks5_cycle_free( cycle );
 		return ERROR;
 	}
-	
+
 	cycle->in->recv_connection = cycle->down;
 	cycle->in->send_connection = cycle->up;
 
@@ -158,7 +158,7 @@ static status socks5_local_pipe( event_t * ev )
 	event_opt( cycle->down->write, EVENT_WRITE );
 	event_opt( cycle->down->read, EVENT_READ );
 	event_opt( cycle->up->write, EVENT_WRITE );
-	
+
 	return AGAIN;
 }
 // socks5_local_response ----
@@ -166,7 +166,7 @@ static status socks5_local_response( event_t * ev )
 {
 	connection_t * down;
 	socks5_cycle_t * cycle;
-	
+
 	down = ev->data;
 	cycle = down->data;
 	status rc;
@@ -195,24 +195,25 @@ static status socks5_local_start( event_t * ev )
 	up = ev->data;
 	cycle = up->data;
 	down = cycle->down;
-	
-	
+
+
 	down->meta->last = down->meta->pos = down->meta->start;
 	*down->meta->last++ = 0x05;
 	*down->meta->last++ = 0x00;
-	*down->meta->last++ = 0x01;
 	*down->meta->last++ = 0x00;
-	
+	*down->meta->last++ = 0x01;
+
 	//
 	*down->meta->last++ = 0x00;
 	*down->meta->last++ = 0x00;
 	*down->meta->last++ = 0x00;
 	*down->meta->last++ = 0x00;
-	
-	*down->meta->last++ = 0x00;
-	*down->meta->last = 0x00;
-	
-	
+
+	*down->meta->last++ = 0x10;
+	*down->meta->last++ = 0x10;
+
+	debug_log("%s ---- socks5 response len [%d]", __func__, meta_len( down->meta->pos, down->meta->last ) );
+
 	up->read->handler = NULL;
 	up->write->handler = NULL;
 	event_opt( down->write, EVENT_WRITE );
@@ -478,7 +479,7 @@ static status socks5_process_request( event_t * ev )
 					(unsigned char)cycle->request.dst_addr[2],
 					(unsigned char)cycle->request.dst_addr[3]
 				);
-				
+
 				debug_log("%s --- dst port [%d]", __func__, ntohs(*(int32*)cycle->request.dst_port ));
 
 				cycle->request.state = 0;
