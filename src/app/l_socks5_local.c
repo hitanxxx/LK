@@ -133,7 +133,10 @@ static status socks5_local_remote_init( event_t * ev )
 	
 	struct addrinfo * res = NULL;
 	string_t port = string("3333");
-	
+	debug_log("%s --- ip [%.*s] port [%.*s]", __func__, 
+		conf.socks5_serverip.len, conf.socks5_serverip.data,
+		port.len, port.data 
+		);
 	res = net_get_addr( &conf.socks5_serverip, &port );
 	if( !res ) {
 		err_log("%s --- net get addr failed", __func__ );

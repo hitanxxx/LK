@@ -678,7 +678,7 @@ static status socks5_server_start( event_t * ev )
 status socks5_server_init( void )
 {
 	if( conf.socks5_mode == SOCKS5_SERVER ) {
-		listen_add( 3333, socks5_server_init_connection, HTTPS );
+		listen_add( 3333, socks5_server_start, HTTPS );
 	}
 	return OK;
 }
