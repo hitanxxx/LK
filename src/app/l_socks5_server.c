@@ -284,15 +284,21 @@ static status socks5_server_address_domain( socks5_cycle_t * cycle )
 	struct addrinfo * res = NULL;
 	char portstr[20] = {0};
 	
+	debug_log("%s --- domain [%.*s]", __func__, 
+		(unsigned char)cycle->request.host_len,
+		cycle->request.dst_addr
+	);
+	
 	ip.data = cycle->request.dst_addr;
 	ip.len = (unsigned char)cycle->request.host_len;
 	snprintf( portstr, sizeof(portstr), "%d", ntohs(*(int32*)cycle->request.dst_port) );
 	port.data = portstr;
 	port.len = l_strlen(portstr);
+	debug_log("%s --- port [%.*s]", __func__, port.len, port.data );
+	
 	res = net_get_addr( &ip, &port );
 	if( !res ) {
 		err_log("%s --- get up address failed", __func__ );
-		socks5_cycle_free( cycle );
 		return ERROR;
 	}
 	memset( &cycle->up->addr, 0, sizeof(struct sockaddr_in) );
@@ -325,7 +331,6 @@ static status socks5_server_address_ipv4( socks5_cycle_t * cycle )
 	res = net_get_addr( &ip, &port );
 	if( !res ) {
 		err_log("%s --- get up address failed", __func__ );
-		socks5_cycle_free( cycle );
 		return ERROR;
 	}
 	memset( &cycle->up->addr, 0, sizeof(struct sockaddr_in) );
@@ -341,7 +346,6 @@ static status socks5_server_connect( event_t * ev )
 	
 	c = ev->data;
 	cycle = c->data;
-
 	debug_log("%s --- socks5_server_connect", __func__  );
 	if( OK != net_alloc( &cycle->up ) ) {
 		err_log("%s --- net alloc up", __func__ );
