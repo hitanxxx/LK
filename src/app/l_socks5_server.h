@@ -12,7 +12,7 @@ typedef struct socks5_init_t {
 	char 	ver;
 	char 	nmethod;
 	int32	offset;
-	char 	method[255];
+	char 	method[256];
 } socks5_init_t;
 
 typedef struct socks5_request_t {
@@ -22,8 +22,9 @@ typedef struct socks5_request_t {
 	char		rsv;
 	char		atyp;
 	
-	char		dst_addr[100];
+	char		dst_addr[256];
 	int32 		offset;
+	char		host_len;
 	char		dst_port[2];
 } socks5_request_t;
 

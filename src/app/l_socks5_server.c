@@ -277,38 +277,36 @@ static status socks5_server_connect_start( event_t * ev )
 	}
 	return up->write->handler( up->write );
 }
-// socks5_server_connect -----------
-static status socks5_server_connect( event_t * ev )
+// socks5_server_address_domain -------
+static status socks5_server_address_domain( socks5_cycle_t * cycle ) 
 {
-	connection_t * c, * up;
-	socks5_cycle_t * cycle;
+	string_t ip, port;
+	struct addrinfo * res = NULL;
+	char portstr[20] = {0};
+	
+	ip.data = cycle->request.dst_addr;
+	ip.len = (unsigned char)cycle->request.host_len;
+	snprintf( portstr, sizeof(portstr), "%d", ntohs(*(int32*)cycle->request.dst_port) );
+	port.data = portstr;
+	port.len = l_strlen(portstr);
+	res = net_get_addr( &ip, &port );
+	if( !res ) {
+		err_log("%s --- get up address failed", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	memset( &cycle->up->addr, 0, sizeof(struct sockaddr_in) );
+	memcpy( &cycle->up->addr, res->ai_addr, sizeof(struct sockaddr_in) );
+	freeaddrinfo( res );
+	return OK;
+}
+// socks5_server_address_ipv4 ---------
+static status socks5_server_address_ipv4( socks5_cycle_t * cycle )
+{
 	struct addrinfo * res = NULL;
 	string_t ip, port;
 	char ipstr[100] = {0}, portstr[20] = {0};
 	
-	c = ev->data;
-	cycle = c->data;
-
-	debug_log("%s --- socks5_server_connect", __func__  );
-	if( OK != net_alloc( &cycle->up ) ) {
-		err_log("%s --- net alloc up", __func__ );
-		socks5_cycle_free( cycle );
-		return ERROR;
-	}
-	cycle->up->send = sends;
-	cycle->up->recv = recvs;
-	cycle->up->send_chain = send_chains;
-	cycle->up->recv_chain = NULL;
-	cycle->up->data = (void*)cycle;
-
-	if( !cycle->up->meta ) {
-		if( OK != meta_alloc( &cycle->up->meta, 4096 ) ) {
-			err_log( "%s --- up meta alloc", __func__ );
-			socks5_cycle_free( cycle );
-			return ERROR;
-		}
-	}
-
 	// getaddrinfo
 	snprintf( ipstr, sizeof(ipstr), "%d.%d.%d.%d", (unsigned char )cycle->request.dst_addr[0],
 	(unsigned char )cycle->request.dst_addr[1],
@@ -333,6 +331,52 @@ static status socks5_server_connect( event_t * ev )
 	memset( &cycle->up->addr, 0, sizeof(struct sockaddr_in) );
 	memcpy( &cycle->up->addr, res->ai_addr, sizeof(struct sockaddr_in) );
 	freeaddrinfo( res );
+	return OK;
+}
+// socks5_server_connect -----------
+static status socks5_server_connect( event_t * ev )
+{
+	connection_t * c, * up;
+	socks5_cycle_t * cycle;
+	
+	c = ev->data;
+	cycle = c->data;
+
+	debug_log("%s --- socks5_server_connect", __func__  );
+	if( OK != net_alloc( &cycle->up ) ) {
+		err_log("%s --- net alloc up", __func__ );
+		socks5_cycle_free( cycle );
+		return ERROR;
+	}
+	cycle->up->send = sends;
+	cycle->up->recv = recvs;
+	cycle->up->send_chain = send_chains;
+	cycle->up->recv_chain = NULL;
+	cycle->up->data = (void*)cycle;
+
+	if( !cycle->up->meta ) {
+		if( OK != meta_alloc( &cycle->up->meta, 4096 ) ) {
+			err_log( "%s --- up meta alloc", __func__ );
+			socks5_cycle_free( cycle );
+			return ERROR;
+		}
+	}
+
+	if( cycle->request.atyp == 0x01 ) {
+		if( OK != socks5_server_address_ipv4( cycle ) ) {
+			err_log("%s --- server address ipv4 failed", __func__ );
+			socks5_cycle_free( cycle );
+			return ERROR;
+		}
+	} else if ( cycle->request.atyp == 0x03 ) {
+		if( OK != socks5_server_address_domain( cycle ) ) {
+			err_log("%s --- server address ipv4 failed", __func__ );
+			socks5_cycle_free( cycle );
+			return ERROR;
+		}
+	} else {
+		err_log("%s --- not support socks5 request atyp [%x]", __func__, cycle->request.atyp );
+	}
 
 	cycle->down->read->handler = NULL;
 	cycle->down->write->handler = NULL;
@@ -349,7 +393,6 @@ static status socks5_process_request( event_t * ev )
 	connection_t * c;
 	socks5_cycle_t * cycle = NULL;
 	ssize_t rc;
-	char host_len = 0;
 	int32 i = 0;
 
 	enum{
@@ -357,7 +400,6 @@ static status socks5_process_request( event_t * ev )
 		cmd,
 		rsv,
 		atyp,
-		dst_addr_start,
 		dst_addr,
 		dst_host,
 		dst_port,
@@ -405,47 +447,32 @@ static status socks5_process_request( event_t * ev )
 			}
 			if( state == atyp ) {
 				cycle->request.atyp = *p;
-				state = dst_addr_start;
-				continue;
-			}
-			if( state == dst_addr_start ) {
-				cycle->request.dst_addr[cycle->request.offset++] = *p;
 				state = dst_addr;
 				continue;
 			}
 			if( state == dst_addr ) {
-				switch( cycle->request.atyp ) {
-					case (0x01):
-						if( cycle->request.offset >= 4 ) {
-							state = dst_port;
-						} else {
-							cycle->request.dst_addr[cycle->request.offset++] = *p;
-						}
-						break;
-					case (0x03):
-						host_len = *p;
-						state = dst_host;
-						break;
-					case (0x04):
-						if( cycle->request.offset >= 16 ) {
-							state = dst_port;
-						} else {
-							cycle->request.dst_addr[cycle->request.offset++] = *p;
-						}
-
-						break;
-					default:
-						break;
+				cycle->request.dst_addr[cycle->request.offset++] = *p;
+				if( cycle->request.atyp == 0x01 ) {
+					if( cycle->request.offset >= 4 ) {
+						state = dst_port;
+					}
+				} else if ( cycle->request.atyp == 0x03 ) {
+					cycle->request.host_len = *p;
+					state = dst_host;
+					continue;
+				} else if ( cycle->request.atyp == 0x04 ) {
+					if( cycle->request.offset >= 16 ) {
+						state = dst_port;
+					}
 				}
-				//continue;
 			}
 			if( state == dst_host ) {
-				if( cycle->request.offset >= (int32)host_len ) {
+				if( cycle->request.offset >= (int32)cycle->request.host_len ) {
 					state = dst_port;
 				} else {
 					cycle->request.dst_addr[cycle->request.offset ++] = *p;
+					continue;
 				}
-				continue;
 			}
 			if( state == dst_port ) {
 				cycle->request.dst_port[0] = *p;
