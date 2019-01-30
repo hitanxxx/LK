@@ -453,16 +453,18 @@ static status socks5_process_request( event_t * ev )
 			if( state == dst_addr ) {
 				cycle->request.dst_addr[cycle->request.offset++] = *p;
 				if( cycle->request.atyp == 0x01 ) {
-					if( cycle->request.offset >= 4 ) {
+					if( cycle->request.offset == 4 ) {
 						state = dst_port;
+						continue;
 					}
 				} else if ( cycle->request.atyp == 0x03 ) {
 					cycle->request.host_len = *p;
 					state = dst_host;
 					continue;
 				} else if ( cycle->request.atyp == 0x04 ) {
-					if( cycle->request.offset >= 16 ) {
+					if( cycle->request.offset == 16 ) {
 						state = dst_port;
+						continue;
 					}
 				}
 			}
@@ -611,7 +613,7 @@ static status socks5_local_auth_process( event_t * ev )
 			}
 			if( state == method ) {
 				cycle->init.method[cycle->init.offset++] = *p;
-				if( cycle->init.offset >= cycle->init.nmethod ) {
+				if( cycle->init.offset == cycle->init.nmethod ) {
 					debug_log("%s --- socks5 auth process success", __func__ );
 					down->read->handler = socks5_server_auth_response_prepare;
 					return down->read->handler( down->read );
