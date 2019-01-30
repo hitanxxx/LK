@@ -33,6 +33,9 @@ typedef struct config_t
 	// lktp
 	uint32		lktp_mode;
 	string_t 	lktp_serverip;
+	// socks5 
+	uint32		socks5_mode;
+	string_t 	socks5_serverip;
 
 }config_t;
 

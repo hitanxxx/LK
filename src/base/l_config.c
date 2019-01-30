@@ -252,6 +252,40 @@ static status config_parse_lktp( json_node_t * json )
 	}
 	return OK;
 }
+// config_parse_socks5 -------------
+static status config_parse_socks5( json_node_t * json )
+{
+	json_node_t * root_obj, *socks5_obj, *v;
+	status rc;
+
+	json_get_child( json, 1, &root_obj );
+	if( OK == json_get_obj_obj(root_obj, "socks5", l_strlen("socks5"), &socks5_obj ) ) {
+		rc = json_get_obj_str(socks5_obj, "mode", l_strlen("mode"), &v );
+		if( rc == ERROR ) {
+			err_log("%s --- tunnel need specify a valid 'mode'", __func__ );
+			return ERROR;
+		}
+		// server
+		// client
+		if ( OK == l_strncmp_cap( v->name.data, v->name.len, "server", l_strlen("server") ) ) {
+			conf.socks5_mode = SOCKS5_SERVER;
+		} else if ( OK == l_strncmp_cap( v->name.data, v->name.len, "client", l_strlen("client") ) ) {
+			conf.socks5_mode = SOCKS5_CLIENT;
+			rc = json_get_obj_str(socks5_obj, "serverip", l_strlen("serverip"), &v );
+			if( rc == ERROR ) {
+				err_log("%s --- tunnel mode client need specify a valid 'serverip'", __func__ );
+				return ERROR;
+			}
+			conf.socks5_serverip.data = v->name.data;
+			conf.socks5_serverip.len = v->name.len;
+		} else {
+			err_log("%s --- tunnel invalid 'mode' [%.*s]", __func__,
+			v->name.len, v->name.data );
+			return ERROR;
+		}
+	}
+	return OK;
+}
 // config_parse -----
 static status config_parse( json_node_t * json )
 {
@@ -273,6 +307,10 @@ static status config_parse( json_node_t * json )
 	}
 	if( OK != config_parse_lktp( json ) ) {
 		err_log( "%s --- parse lktp", __func__ );
+		return ERROR;
+	}
+	if( OK != config_parse_socks5( json ) ) {
+		err_log("%s --- parse socks5", __func__ );
 		return ERROR;
 	}
 	return OK;

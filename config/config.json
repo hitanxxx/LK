@@ -24,5 +24,8 @@
 	},
 	"perf":{
 		"switch":false
+	},
+	"socks5":{
+		"mode":"client"
 	}
 }
