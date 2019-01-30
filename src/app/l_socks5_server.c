@@ -463,6 +463,7 @@ static status socks5_process_request( event_t * ev )
 					}
 				} else if ( cycle->request.atyp == 0x03 ) {
 					cycle->request.host_len = *p;
+					cycle->request.offset = 0;
 					state = dst_host;
 					continue;
 				} else if ( cycle->request.atyp == 0x04 ) {
