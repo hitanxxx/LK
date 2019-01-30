@@ -473,10 +473,9 @@ static status socks5_process_request( event_t * ev )
 				}
 			}
 			if( state == dst_host ) {
-				if( cycle->request.offset >= (int32)cycle->request.host_len ) {
+				cycle->request.dst_addr[cycle->request.offset++] = *p;
+				if( cycle->request.offset == (unsigned char)cycle->request.host_len ) {
 					state = dst_port;
-				} else {
-					cycle->request.dst_addr[cycle->request.offset ++] = *p;
 					continue;
 				}
 			}
