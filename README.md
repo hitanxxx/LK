@@ -13,6 +13,8 @@ lk-tunnel SSL tunnel(翻墙模式)/http|https proxy。</br>
 ## LK-WEB
 lk-web 一个小巧简单的web服务器，支持部分http特征。</br>
 简单的路由提供webservice。以及静态文件服务。
+## LK-socks5
+lk-socks5 一个socks5代理模块。client与server使用OpenSSL加密。
 
 # Install
 lk的功能模块需要OpenSSL库。解决依赖后。在文件目录运行：
@@ -66,6 +68,9 @@ reload all worker process
 	},
 	"lktp":{
 		"mode":"server"
+	},
+	"socks5":{
+		"mode":"server"
 	}
 
 }
@@ -95,6 +100,12 @@ the configuration file can be divided into three part:
 > * switch - 是否开启性能测试模块。false时不处理web应用性能测试请求。
 * lktp 块，关于lktp通信的相关设置。
 > * mode - lktp运行的模式，server模式开启5555端口，client模式需要指定serverip字段说明lktp server的ip地址。lktp使用tcp长连接。
+* socks5 块，socks5模块的相关设置。
+> * mode - socks5模块运行的模式。支持client/server两种模式。</br>
+client占用1080端口。server占用3333端口。</br>
+以client运行时，需要制定serverip字段，设置server的ip信息。
+> * serverip - 以client模式运行时，server的ip地址。
+
 # Tips
 * 通过 /perform.html进入web应用性能测试的UI页面。
 * tunnel模块使用的端口为7324，7325。client/proxy使用7325。server使用7324。暂不能通过配置修改。
