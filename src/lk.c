@@ -3,25 +3,37 @@
 static char * l_process_signal = NULL;
 static int32  l_process_signal_type = 0;
 
+modules_init_t init_modules[] = {
+	{log_init,			"log"},
+	{config_init,		"config"},
+	{l_signal_init,		"signal"},	// no end
+	{process_init,		"process"},	// no end
+	{listen_init,		"listen"},
+	{event_init,		"event"},
+	{ssl_init,			"ssl"},		// no end
+	{serv_init,			"serv"},
+	{tunnel_init,		"tunnel"},	// no end
+	{webser_init,		"webser"},	// no end
+	{perform_init,		"perform"},	
+	{webapi_init,		"webapi"},	// no end
+	{lktpserv_init,		"lktpserv"},// no end
+	{socks5_server_init,	"socks5_serv"},	// no end
+	{socks5_local_init,		"socks5_local"},// no end
+	{NULL,	NULL}
+};
+
 // module_init -----------------
 static status module_init( void )
 {
-	log_init();
-	config_init();
-	l_signal_init();	// no end
-	process_init();		// no end
-	listen_init();
-	event_init();
-	ssl_init();			// no end
-	serv_init();
-	tunnel_init();		// no end
-	webser_init();		// no end
-	perform_init();
-	webapi_init();		// no end
-	lktpserv_init();	// no end
+	int i = 0;
 	
-	socks5_server_init(); 	// no end
-	socks5_local_init(); 	// no end
+	while( init_modules[i].pt != NULL ) {
+		if( OK != init_modules[i].pt() ) {
+			err_log("%s --- modules init failed [%s]", __func__, init_modules[i].str );
+			return ERROR;
+		}
+		i++;
+	}
 	return OK;
 }
 // modules_end ----------------

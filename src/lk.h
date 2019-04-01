@@ -42,6 +42,12 @@
 
 #include "l_webapi.h"
 
+typedef status ( * module_init_pt )(void);
+typedef struct modules_init {
+	module_init_pt	pt;
+	char *			str;
+}modules_init_t;
+
 status dynamic_module_init( void );
 status dynamic_module_end( void );
 status modules_end( void );
