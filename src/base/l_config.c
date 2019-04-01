@@ -334,6 +334,7 @@ static status config_start( void )
 		goto failed;
 	}
 	if( OK != config_parse( &ctx->root ) ) {
+		err_log("%s --- config parse failed", __func__ );
 		goto failed;
 	}
 	json_ctx_free( ctx );
